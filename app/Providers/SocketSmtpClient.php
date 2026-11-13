@@ -21,7 +21,7 @@ final class SocketSmtpClient implements SmtpClientInterface
    foreach(['to','cc','bcc'] as $k){$v=$message[$k]??[];$items=is_array($v)?$v:preg_split('/[,;]+/',$v,-1,PREG_SPLIT_NO_EMPTY);foreach($items as $a)$recipients[]=$this->extract(trim((string)$a));}
    $recipients=array_values(array_unique($recipients));if(!$recipients)throw new \InvalidArgumentException('At least one recipient is required.');
    $this->command($s,'MAIL FROM:<'.$from.'>',[250]);foreach($recipients as $r)$this->command($s,'RCPT TO:<'.$r.'>',[250,251]);$this->command($s,'DATA',[354]);
-   $raw=($this->mime??new MimeMessageBuilder())->build($message);$raw=preg_replace('/(?m)^\./','..',$raw);fwrite($s,rtrim($raw,"\r\n")."\r\n.\r\n");$this->expect($s,[250]);$this->command($s,'QUIT',[221]);
+   $raw=is_string($message['raw']??null)?$message['raw']:($this->mime??new MimeMessageBuilder())->build($message);$raw=preg_replace('/(?m)^\./','..',$raw);fwrite($s,rtrim($raw,"\r\n")."\r\n.\r\n");$this->expect($s,[250]);$this->command($s,'QUIT',[221]);
   }finally{fclose($s);}
  }
  private function extract(string $v):string{if(!preg_match('/<?([^<>\s]+@[^<>\s]+)>?$/',$v,$m)||!filter_var($m[1],FILTER_VALIDATE_EMAIL))throw new \InvalidArgumentException('Invalid email address.');return $m[1];}
