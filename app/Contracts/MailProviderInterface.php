@@ -7,4 +7,6 @@ interface MailProviderInterface
     public function provision(array $mailbox):array;
     public function suspend(string $providerId):void;
     public function delete(string $providerId):void;
+    /** Return provider connection settings; never include mailbox passwords. */
+    public function connectionSettings():array;
 }

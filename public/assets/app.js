@@ -1,0 +1,1 @@
+document.addEventListener('submit',function(e){const f=e.target;if(f.matches('[data-confirm]')&&!window.confirm(f.dataset.confirm))e.preventDefault();});
