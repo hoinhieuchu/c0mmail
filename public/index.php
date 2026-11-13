@@ -9,7 +9,9 @@ $config=Config::load(dirname(__DIR__).'/.env');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$config->get('APP_ENV')==='production','samesite'=>'Lax']);session_start();}
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
-$providerName=$config->get('MAIL_PROVIDER','manual');$provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
+$providerName=$config->get('MAIL_PROVIDER','manual');
+if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
+$provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
 $service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$config);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
@@ -17,5 +19,6 @@ $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
 $router->get('/login',fn()=>$authController->showLogin());$router->post('/login',fn()=>$authController->login());$router->post('/logout',fn()=>$authController->logout());
 $router->get('/dashboard',fn()=>$dashboard->index());$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
+$router->post('/admin/mailboxes/{id}/activate',fn(array $p)=>$admin->activateManual((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/suspend',fn(array $p)=>$admin->suspend((int)$p['id']));
 $router->dispatch($_SERVER['REQUEST_METHOD']??'GET',parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/');
