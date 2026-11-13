@@ -13,7 +13,7 @@ $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
 $service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);
-$dashboard=new DashboardController($auth,$mailboxes,$view,$config);
+$dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
