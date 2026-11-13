@@ -26,6 +26,12 @@ final class MailboxService
             throw $e;
         }
     }
+    public function activateManual(int $id):void
+    {
+        $m=$this->repo->find($id);
+        if(!$m||$m['provider']!=='manual'||$m['status']!=='manual_pending')throw new \RuntimeException('Only pending manual mailboxes can be confirmed active.');
+        $this->repo->setStatus($id,'active');
+    }
     public function suspend(int $id):void
     {
         $m=$this->repo->find($id);if(!$m||$m['status']==='deleted')throw new \RuntimeException('Mailbox not found.');
