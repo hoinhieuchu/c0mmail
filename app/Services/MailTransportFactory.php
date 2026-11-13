@@ -11,7 +11,7 @@ final class MailTransportFactory
  public function __construct(private Config $config){}
  public function imap(array $mailbox):ImapClientInterface
  {
-  return new NativeImapClient($this->config->required('MAIL_IMAP_HOST'),(int)$this->config->get('MAIL_IMAP_PORT','993'),$this->config->get('MAIL_IMAP_ENCRYPTION','ssl'),$mailbox['email'],$mailbox['password']);
+  return new NativeImapClient($this->config->required('MAIL_IMAP_HOST'),(int)$this->config->get('MAIL_IMAP_PORT','993'),$this->config->get('MAIL_IMAP_ENCRYPTION','ssl'),$mailbox['email'],$mailbox['password'],(int)$this->config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'));
  }
  public function smtp(array $mailbox):SmtpClientInterface
  {
