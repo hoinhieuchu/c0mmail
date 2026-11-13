@@ -44,7 +44,7 @@ final class NativeImapClient implements ImapClientInterface
  public function move(string $folder,int $uid,string $destination):void{$this->select($folder);if(!$this->validFolder($destination)||!imap_mail_move($this->stream,(string)$uid,$this->mailbox($destination),CP_UID)||!imap_expunge($this->stream))throw new \RuntimeException('Unable to move message.');}
  public function delete(string $folder,int $uid):void{$this->select($folder);if(!imap_setflag_full($this->stream,(string)$uid,'\\Deleted',ST_UID)||!imap_expunge($this->stream))throw new \RuntimeException('Unable to delete message.');}
  public function createFolder(string $folder):void{if(!$this->validFolder($folder)||!imap_createmailbox($this->stream,imap_utf7_encode($this->mailbox($folder))))throw new \RuntimeException('Unable to create folder.');}
- public function append(string $folder,string $rawMessage,string $flags=''):void{if(!$this->validFolder($folder)||!imap_append($this->stream,imap_utf7_encode($this->mailbox($folder)),$rawMessage,trim('\\Seen '.$flags)))throw new \RuntimeException('Unable to save message to folder.');}
+ public function append(string $folder,string $rawMessage,string $flags=''):void{if(!$this->validFolder($folder)||!imap_append($this->stream,imap_utf7_encode($this->mailbox($folder)),$rawMessage,trim($flags)))throw new \RuntimeException('Unable to save message to folder.');}
  public function downloadPart(string $folder,int $uid,string $part):array
  {
   $this->select($folder);$s=imap_fetchstructure($this->stream,$uid,FT_UID);$meta=$s?$this->findPart($s,$part):null;if(!$meta)throw new \RuntimeException('Attachment not found.');
