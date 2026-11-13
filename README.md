@@ -1,3 +1,40 @@
 # c0m.me Mail
 
-Initial repository bootstrap. Application development is maintained on a dedicated feature branch; see that branch for the implementation and setup documentation.
+Lightweight PHP MVC mail-account management application for cPanel/shared hosting. MariaDB/MySQL via PDO; vanilla JavaScript and CSS.
+
+## Implemented foundation
+
+- Local account authentication, role-based admin access, CSRF protection, and session ID rotation.
+- Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
+- Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
+- Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, status tracking, and SMTP/IMAP client settings.
+- SQL migration, CLI account bootstrap, built-in test runner, and GitHub Actions PHP lint/test workflow.
+
+This is an account-management foundation, not a browser-based IMAP client. It does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider.
+
+## Requirements
+
+PHP 8.1+, PDO MySQL, OpenSSL, JSON, sessions. MariaDB 10.5+ or MySQL 8+. cURL is optional.
+
+## Quick start
+
+1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`.
+3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
+4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
+5. Visit `APP_URL` and sign in.
+
+## Provider modes
+
+- `MAIL_PROVIDER=manual`: safe default. Create the mailbox in CraneMail first, then register it in the admin screen. The application marks it `manual_pending`; it does not claim remote provisioning succeeded. Manual suspension requires confirmation that it was already suspended in the provider control panel.
+- `MAIL_PROVIDER=cranemail`: enables the HTTP adapter. Configure API base URL, bearer token, and endpoint paths. The adapter contract is described in [architecture](docs/architecture.md). No API credentials are committed. Verify the contract against CraneMail's actual documentation/sandbox before enabling this mode.
+
+## Tests
+
+Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. GitHub Actions runs both on pushes and pull requests.
+
+## Security and limitations
+
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. Initial release does not include password reset, member self-service registration, mailbox password reset, OIDC, webmail message reading/composition, billing, or domain verification. Configure these before public production launch.
+
+See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
