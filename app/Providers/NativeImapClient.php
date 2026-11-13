@@ -5,13 +5,13 @@ use App\Contracts\ImapClientInterface;
 final class NativeImapClient implements ImapClientInterface
 {
  private $stream;
- private string $base;
- public function __construct(string $host,int $port,string $encryption,string $username,string $password)
+ private string $base;\n private int $maxAttachmentBytes;
+ public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760)
  {
   if(!function_exists('imap_open'))throw new \RuntimeException('PHP IMAP extension is required on this hosting account.');
   $suffix=match($encryption){'ssl'=>'/imap/ssl/validate-cert','starttls'=>'/imap/tls/validate-cert','none'=>'/imap/notls',default=>throw new \InvalidArgumentException('Unsupported IMAP encryption mode.')};
   if(preg_match('/[{}\r\n]/',$host))throw new \InvalidArgumentException('Invalid IMAP host.');
-  $this->base='{'.$host.':'.$port.$suffix.'}';
+  $this->base='{'.$host.':'.$port.$suffix.'}';$this->maxAttachmentBytes=max(1,$maxAttachmentBytes);
   $this->stream=@imap_open($this->base.'INBOX',$username,$password,0,1,['DISABLE_AUTHENTICATOR'=>'GSSAPI']);
   if(!$this->stream)throw new \RuntimeException('IMAP connection failed: '.(imap_last_error()?:'authentication or network error'));
  }
@@ -47,7 +47,7 @@ final class NativeImapClient implements ImapClientInterface
  public function downloadPart(string $folder,int $uid,string $part):array
  {
   $this->select($folder);$s=imap_fetchstructure($this->stream,$uid,FT_UID);$meta=$s?$this->findPart($s,$part):null;if(!$meta)throw new \RuntimeException('Attachment not found.');
-  $raw=imap_fetchbody($this->stream,$uid,$part,FT_UID);$data=match((int)($meta->encoding??0)){3=>base64_decode($raw,true),4=>quoted_printable_decode($raw),default=>$raw};if($data===false)throw new \RuntimeException('Invalid attachment encoding.');
+  if((int)($meta->bytes??0)>$this->maxAttachmentBytes)throw new \\RuntimeException('Attachment exceeds the configured download limit.');$raw=imap_fetchbody($this->stream,$uid,$part,FT_UID);$data=match((int)($meta->encoding??0)){3=>base64_decode($raw,true),4=>quoted_printable_decode($raw),default=>$raw};if($data===false)throw new \RuntimeException('Invalid attachment encoding.');
   return ['name'=>$this->partName($meta)?:'attachment','type'=>$this->type($meta),'data'=>$data];
  }
  public function close():void{if($this->stream){imap_close($this->stream);$this->stream=null;}}
