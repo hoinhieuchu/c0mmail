@@ -9,7 +9,7 @@ final class Config
         $values=[];
         if (is_file($path)) foreach (file($path, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
             $line=trim($line); if ($line==='' || str_starts_with($line,'#') || !str_contains($line,'=')) continue;
-            [$key,$value]=explode('=',$line,2); $values[trim($key)]=trim(trim($value), " \"'");
+            [$key,$value]=explode('=',$line,2); $values[trim($key)]=trim(trim($value), " \t\n\r\0\x0B\"'");
         }
         return new self(array_merge($values,$_ENV));
     }
