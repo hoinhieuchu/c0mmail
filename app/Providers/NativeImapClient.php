@@ -5,7 +5,8 @@ use App\Contracts\ImapClientInterface;
 final class NativeImapClient implements ImapClientInterface
 {
  private $stream;
- private string $base;\n private int $maxAttachmentBytes;
+ private string $base;
+ private int $maxAttachmentBytes;
  public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760)
  {
   if(!function_exists('imap_open'))throw new \RuntimeException('PHP IMAP extension is required on this hosting account.');
