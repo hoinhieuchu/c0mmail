@@ -23,7 +23,7 @@ final class MailboxWebmailService
  public function saveDraft(array $credentials,array $message):void
  {
   $folders=$this->folders($credentials);$drafts=$this->roleFolder($folders,'drafts');if($drafts===null)throw new \RuntimeException('The mail server does not expose a Drafts folder.');
-  $raw=$this->mime->build($message);$imap=$this->transports->imap($credentials);try{$imap->append($drafts,$raw,'\\Draft');}finally{$imap->close();}
+  $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);try{$imap->append($drafts,$raw,'\\Draft');}finally{$imap->close();}
  }
  public function send(array $credentials,array $message):void
  {
