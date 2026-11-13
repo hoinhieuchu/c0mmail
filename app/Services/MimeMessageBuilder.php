@@ -6,10 +6,10 @@ final class MimeMessageBuilder
  public function build(array $m,bool $allowEmptyTo=false):string
  {
   $from=$this->address((string)($m['from']??''));$to=$this->addresses($m['to']??'');$cc=$this->addresses($m['cc']??'');
-  if(!$to)throw new \InvalidArgumentException('At least one To recipient is required.');
+  if(!$to&&!$allowEmptyTo)throw new \InvalidArgumentException('At least one To recipient is required.');
   $boundary='=_c0m_'.bin2hex(random_bytes(18));$headers=['Date: '.date(DATE_RFC2822),'From: '.$from];if($to)$headers[]='To: '.implode(', ',$to);
   if($cc)$headers[]='Cc: '.implode(', ',$cc);
-  $headers[]='Subject: =?UTF-8?B?'.base64_encode((string)($m['subject']??'')).'?=';$headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.substr(strrchr($m['from'],'@')?:'@localhost',1).'>';
+  $domain=substr(strrchr((string)$m['from'],'@')?:'@localhost',1);$headers[]='Subject: =?UTF-8?B?'.base64_encode((string)($m['subject']??'')).'?=';$headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.$domain.'>';
   $headers[]='MIME-Version: 1.0';$headers[]='Content-Type: multipart/mixed; boundary="'.$boundary.'"';
   $body="--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode((string)($m['body']??'')));
   foreach(($m['attachments']??[]) as $a){$name=basename((string)$a['name']);$type=preg_match('#^[a-z0-9.+-]+/[a-z0-9.+-]+$#i',(string)($a['type']??''))?$a['type']:'application/octet-stream';$data=file_get_contents($a['path']);if($data===false)throw new \RuntimeException('Unable to read an attachment.');$encoded=rawurlencode($name);$body.="--{$boundary}\r\nContent-Type: {$type}; name*=UTF-8''{$encoded}\r\nContent-Disposition: attachment; filename*=UTF-8''{$encoded}\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode($data));}
