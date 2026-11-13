@@ -3,11 +3,11 @@ declare(strict_types=1);
 namespace App\Services;
 final class MimeMessageBuilder
 {
- public function build(array $m):string
+ public function build(array $m,bool $allowEmptyTo=false):string
  {
   $from=$this->address((string)($m['from']??''));$to=$this->addresses($m['to']??'');$cc=$this->addresses($m['cc']??'');
   if(!$to)throw new \InvalidArgumentException('At least one To recipient is required.');
-  $boundary='=_c0m_'.bin2hex(random_bytes(18));$headers=['Date: '.date(DATE_RFC2822),'From: '.$from,'To: '.implode(', ',$to)];
+  $boundary='=_c0m_'.bin2hex(random_bytes(18));$headers=['Date: '.date(DATE_RFC2822),'From: '.$from];if($to)$headers[]='To: '.implode(', ',$to);
   if($cc)$headers[]='Cc: '.implode(', ',$cc);
   $headers[]='Subject: =?UTF-8?B?'.base64_encode((string)($m['subject']??'')).'?=';$headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.substr(strrchr($m['from'],'@')?:'@localhost',1).'>';
   $headers[]='MIME-Version: 1.0';$headers[]='Content-Type: multipart/mixed; boundary="'.$boundary.'"';
