@@ -37,6 +37,6 @@ jobs:
           MAIL_TEST_HOST: 127.0.0.1
           MAIL_TEST_IMAP_PORT: 3143
           MAIL_TEST_SMTP_PORT: 3025
-          MAIL_TEST_USER: test@example.test
+          MAIL_TEST_USER: test\n          MAIL_TEST_EMAIL: test@example.test
           MAIL_TEST_PASSWORD: secret
         run: php tests/integration-mail.php
