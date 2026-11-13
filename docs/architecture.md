@@ -1,36 +1,39 @@
 # Architecture
 
-## Layers
+## Application layers
 
-- `public/index.php`: front controller and route registration.
-- `app/Core`: configuration, PDO connection, router, view, CSRF, and authentication primitives.
-- `app/Controllers`: HTTP orchestration.
-- `app/Repositories`: parameterized SQL persistence.
-- `app/Services`: mailbox lifecycle and encryption boundary.
-- `app/Contracts`: replaceable identity and mail-provider contracts.
-- `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
+- `public/index.php`: front controller, dependency wiring and routes.
+- `app/Core`: configuration, PDO, router, authentication, CSRF and views.
+- `app/Controllers`: request validation, authorization and HTTP responses.
+- `app/Repositories`: parameterized MariaDB/MySQL persistence.
+- `app/Services`: mailbox credential decryption, transport factory, MIME builder and webmail orchestration.
+- `app/Contracts`: identity, IMAP and SMTP interfaces.
+- `app/Providers`: local identity, manual/CraneMail provisioning, native PHP IMAP and socket SMTP.
 
-## Identity adapter
+## Identity provider boundary
 
-Controllers obtain the current principal through `MemberProviderInterface`. The shipped `LocalSessionMemberProvider` reads the authenticated local account from the database. A future OIDC implementation should validate issuer, audience, signature, state, nonce, and PKCE, then map the verified subject to a local member. No Account Center endpoints or SSO assumptions are embedded.
+Controllers use `MemberProviderInterface`. The current local session provider is used for development. A future OIDC provider must validate issuer, audience, signature, state, nonce and PKCE, then map the verified subject to a local member. No Account Center endpoint or SSO assumption is embedded.
 
-## Mail-provider contract
+## Mail infrastructure and transport
 
-`MailProviderInterface` exposes `provision`, `suspend`, `delete`, and `connectionSettings`. The connection settings method returns SMTP/IMAP host, port, and encryption mode without exposing passwords.
+CraneMail is an external mailbox host, not a webmail UI dependency. `ImapClientInterface` and `SmtpClientInterface` isolate the engine from any specific mail host. `NativeImapClient` uses PHP's IMAP extension with TLS certificate verification. `SocketSmtpClient` implements SMTP greeting/EHLO, optional STARTTLS or implicit TLS, AUTH LOGIN, envelope recipients, DATA, MIME transfer and dot-stuffing.
 
-Manual mode returns `manual_pending` and makes no external API call. An administrator must create the mailbox at CraneMail, then confirm activation in the admin screen. Manual suspension is recorded only after the operator confirms that they already suspended the mailbox in CraneMail. The app does not claim to have changed the remote mailbox in manual mode.
+The configured mailbox email/password authenticate to both protocols. The password is AES-256-GCM encrypted in the mailboxes table and decrypted only in request memory. It is not stored in a PHP session, rendered in HTML, or written to application logs. SMTP AUTH commands and IMAP credentials are not logged.
 
-The CraneMail adapter sends JSON over HTTPS with bearer authentication. No verified CraneMail API specification or credentials were supplied during implementation, so the adapter uses configurable endpoint paths and a clearly documented provisional JSON contract:
-- Provision: POST configured `CRANEMAIL_PROVISION_PATH`, JSON request includes `email`, `password`, `display_name`; response must include a non-empty `id`.
-- Suspend: POST configured `CRANEMAIL_SUSPEND_PATH` with `{id}` replaced by the URL-encoded provider ID.
-- Delete: DELETE configured `CRANEMAIL_DELETE_PATH` with the same placeholder replacement.
+The IMAP adapter lists real server folders, maps common folder names to Inbox/Sent/Drafts/Spam/Trash roles, paginates by UID, searches message text, fetches MIME content and attachments, updates Seen/Flagged flags, moves/deletes messages, creates custom folders and APPENDs drafts/Sent copies. Folder role matching is name-based at present; providers with non-English or unusual names may need explicit folder mapping.
 
-This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are read from environment configuration; they are not inferred from unverified API responses.
+## Message composition and attachments
 
-## Mailbox secrets
+`MimeMessageBuilder` produces multipart MIME. To, CC and BCC are used as SMTP envelope recipients; BCC is deliberately omitted from message headers. Attachment uploads are capped by configuration, limited to five files, and executable/script/web-page extensions are rejected. Downloads are forced to `application/octet-stream` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
-Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_KEY`; only ciphertext, nonce, and tag are stored. The initial password is shown once to the administrator after creation for secure handoff. The application does not offer a later password reveal.
+## Synchronization model
 
-## Deliberate exclusions
+The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged as a generic event and does not claim the delivery failed.
 
-This foundation does not yet implement SMTP send operations or IMAP folder/message retrieval in the browser; it provides connection settings for external mail clients. It also does not run an MTA/IMAP daemon, password-reset email, billing, domain verification, or OIDC flow. These require verified provider capabilities and operational policies.
+## CraneMail provisioning boundary
+
+Manual provisioning remains the default. The existing CraneMail HTTP provisioning adapter has configurable endpoints but is provisional and must be checked against official CraneMail API documentation before enabling. Message send/read operations do not call or infer any CraneMail-specific HTTP API; they use the standard protocols above.
+
+## Production exclusions
+
+No MTA/IMAP server is run by this application. OIDC, password reset, billing, domain verification, HTML rendering/sanitization, inline CID images, OAuth2 mail authentication, provider-special-use folder discovery and push/IDLE sync are not part of this milestone.
