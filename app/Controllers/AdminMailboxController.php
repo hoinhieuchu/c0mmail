@@ -29,6 +29,12 @@ final class AdminMailboxController
             $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'created'=>null,'providerName'=>$this->providerName]);
         }
     }
+    public function activateManual(int $id):void
+    {
+        $this->auth->requireAdmin();Csrf::verify();
+        if($this->providerName!=='manual'||($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Confirm external provisioning first.');}
+        $this->service->activateManual($id);header('Location: /admin/mailboxes');exit;
+    }
     public function suspend(int $id):void
     {
         $this->auth->requireAdmin();Csrf::verify();
