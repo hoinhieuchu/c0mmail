@@ -13,7 +13,7 @@ jobs:
           - 3025:3025
           - 3143:3143
         env:
-          GREENMAIL_OPTS: "-Dgreenmail.hostname=0.0.0.0 -Dgreenmail.setup.test.all -Dgreenmail.users=test@example.test:secret"
+          GREENMAIL_OPTS: "-Dgreenmail.hostname=0.0.0.0 -Dgreenmail.setup.test.all -Dgreenmail.users=test:secret@example.test"
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
