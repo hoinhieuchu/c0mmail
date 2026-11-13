@@ -15,13 +15,13 @@ try{
  $message=['from'=>$user,'to'=>$user,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server.','attachments'=>[['name'=>'probe.txt','path'=>$tmp,'type'=>'text/plain']]];
  $raw=(new MimeMessageBuilder())->build($message);
  (new SocketSmtpClient($host,$smtpPort,'none',$user,$pass))->send($message);
- $listing=null;for($i=0;$i<20;$i++){usleep(250000);$listing=$imap->messages('INBOX',1);if($listing['total']>0)break;}
+ $listing=null;for($i=0;$i<20;$i++){usleep(250000);$listing=$imap->messages('INBOX',1,25);if($listing['total']>0)break;}
  check($listing!==null&&$listing['total']>0,'SMTP message delivered into the real IMAP inbox');
  $uid=(int)$listing['messages'][0]['uid'];$read=$imap->message('INBOX',$uid);
  check(str_contains($read['subject'],'c0m.me Mail integration'),'IMAP fetched message headers and body');
  check(count($read['attachments'])===1,'MIME attachment metadata parsed');
  $download=$imap->downloadPart('INBOX',$uid,$read['attachments'][0]['part']);check(str_contains($download['data'],'real attachment test'),'MIME attachment downloaded and decoded');
- $imap->setFlag('INBOX',$uid,'flagged',true);$imap->move('INBOX',$uid,$custom);$moved=$imap->messages($custom,1);check($moved['total']>0,'IMAP message moved to custom folder');
+ $imap->setFlag('INBOX',$uid,'flagged',true);$imap->move('INBOX',$uid,$custom);$moved=$imap->messages($custom,1,25);check($moved['total']>0,'IMAP message moved to custom folder');
  $movedUid=(int)$moved['messages'][0]['uid'];$imap->delete($custom,$movedUid);check($imap->messages($custom,1)['total']===0,'IMAP message deleted and expunged');
  $imap->append($custom,$raw,'\\Draft');check($imap->messages($custom,1)['total']===1,'IMAP APPEND saves a draft copy');
  unlink($tmp);
