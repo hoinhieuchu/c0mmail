@@ -22,7 +22,7 @@ try{
  check(count($read['attachments'])===1,'MIME attachment metadata parsed');
  $download=$imap->downloadPart('INBOX',$uid,$read['attachments'][0]['part']);check(str_contains($download['data'],'real attachment test'),'MIME attachment downloaded and decoded');
  $imap->setFlag('INBOX',$uid,'flagged',true);$imap->move('INBOX',$uid,$custom);$moved=$imap->messages($custom,1,25);check($moved['total']>0,'IMAP message moved to custom folder');
- $movedUid=(int)$moved['messages'][0]['uid'];$imap->delete($custom,$movedUid);check($imap->messages($custom,1)['total']===0,'IMAP message deleted and expunged');
+ $movedUid=(int)$moved['messages'][0]['uid'];$imap->delete($custom,$movedUid);check($imap->messages($custom,1,25)['total']===0,'IMAP message deleted and expunged');
  $imap->append($custom,$raw,'\\Draft');check($imap->messages($custom,1)['total']===1,'IMAP APPEND saves a draft copy');
  unlink($tmp);
 }finally{$imap->close();}
