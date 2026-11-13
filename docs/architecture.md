@@ -16,14 +16,16 @@ Controllers obtain the current principal through `MemberProviderInterface`. The 
 
 ## Mail-provider contract
 
-`MailProviderInterface` exposes provision, suspend, and delete. Manual mode returns `manual_pending` and makes no external API call. Administrators must create the mailbox at CraneMail first, then register it in this application. Manual suspension is a locally recorded confirmation after the operator suspends it in CraneMail.
+`MailProviderInterface` exposes `provision`, `suspend`, `delete`, and `connectionSettings`. The connection settings method returns SMTP/IMAP host, port, and encryption mode without exposing passwords.
+
+Manual mode returns `manual_pending` and makes no external API call. An administrator must create the mailbox at CraneMail, then confirm activation in the admin screen. Manual suspension is recorded only after the operator confirms that they already suspended the mailbox in CraneMail. The app does not claim to have changed the remote mailbox in manual mode.
 
 The CraneMail adapter sends JSON over HTTPS with bearer authentication. No verified CraneMail API specification or credentials were supplied during implementation, so the adapter uses configurable endpoint paths and a clearly documented provisional JSON contract:
 - Provision: POST configured `CRANEMAIL_PROVISION_PATH`, JSON request includes `email`, `password`, `display_name`; response must include a non-empty `id`.
 - Suspend: POST configured `CRANEMAIL_SUSPEND_PATH` with `{id}` replaced by the URL-encoded provider ID.
 - Delete: DELETE configured `CRANEMAIL_DELETE_PATH` with the same placeholder replacement.
 
-This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are configured separately and never inferred from API responses.
+This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are read from environment configuration; they are not inferred from unverified API responses.
 
 ## Mailbox secrets
 
@@ -31,4 +33,4 @@ Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_
 
 ## Deliberate exclusions
 
-No MTA/IMAP daemon, webmail message reader, outbound mail composer, password-reset email, billing, domain verification, or OIDC flow is included yet. These require verified provider capabilities and operational policies.
+This foundation does not yet implement SMTP send operations or IMAP folder/message retrieval in the browser; it provides connection settings for external mail clients. It also does not run an MTA/IMAP daemon, password-reset email, billing, domain verification, or OIDC flow. These require verified provider capabilities and operational policies.
