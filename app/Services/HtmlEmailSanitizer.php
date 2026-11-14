@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-namespace App\\Services;
+namespace App\Services;
 
 final class HtmlEmailSanitizer
 {
@@ -23,12 +23,12 @@ final class HtmlEmailSanitizer
         if (strlen($html) > 1048576) {
             $html = substr($html, 0, 1048576);
         }
-        if (!class_exists(\\DOMDocument::class)) {
+        if (!class_exists(\DOMDocument::class)) {
             return nl2br(htmlspecialchars(strip_tags($html), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
         }
 
         $previous = libxml_use_internal_errors(true);
-        $document = new \\DOMDocument('1.0', 'UTF-8');
+        $document = new \DOMDocument('1.0', 'UTF-8');
         $loaded = $document->loadHTML(
             '<!doctype html><html><head><meta charset="UTF-8"></head><body><div id="c0m-email-root">'.$html.'</div></body></html>',
             LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING
@@ -50,12 +50,12 @@ final class HtmlEmailSanitizer
         return $result;
     }
 
-    private function cleanChildren(\\DOMNode $parent): void
+    private function cleanChildren(\DOMNode $parent): void
     {
         for ($node = $parent->firstChild; $node !== null;) {
             $next = $node->nextSibling;
-            if ($node instanceof \\DOMComment || !($node instanceof \\DOMElement)) {
-                if (!($node instanceof \\DOMText)) $parent->removeChild($node);
+            if ($node instanceof \DOMComment || !($node instanceof \DOMElement)) {
+                if (!($node instanceof \DOMText)) $parent->removeChild($node);
                 $node = $next;
                 continue;
             }
@@ -79,7 +79,7 @@ final class HtmlEmailSanitizer
             if ($tag === 'a') {
                 $candidate = trim($node->getAttribute('href'));
                 if (preg_match('#^(https?://|mailto:)#i', $candidate)
-                    && !preg_match('/[\\r\\n\\x00-\\x20]/', $candidate)) {
+                    && !preg_match('/[\r\n\x00-\x20]/', $candidate)) {
                     $href = $candidate;
                 }
             }
