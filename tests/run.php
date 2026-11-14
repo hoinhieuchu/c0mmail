@@ -26,7 +26,7 @@ test('HTML email sanitizer removes active content and unsafe attributes',functio
 test('password policy enforces minimum length and safe bounds',function(){
  $p=new PasswordPolicy();
  same(null,$p->validate('correct-horse-battery'));
- same('Password must be at least 14 characters long.',$p->validate('short-password'));
+ same('Password must be at least 14 characters long.',$p->validate('1234567890123'));
  same('Password must not exceed 1024 bytes.',$p->validate(str_repeat('x',1025)));
  same('Password contains an unsupported null character.',$p->validate("contains\0null"));
 });
