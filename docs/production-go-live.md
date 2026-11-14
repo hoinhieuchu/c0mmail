@@ -25,7 +25,7 @@ This application is a webmail client. The mail provider remains responsible for 
 
 - [ ] Create a real mailbox at the provider before registering it in c0m.me Mail.
 - [ ] Register the mailbox using manual provisioning and activate it only after the provider confirms it exists.
-- [ ] Open the mailbox and confirm IMAP folder discovery and Inbox message listing.
+- [ ] Use the administrator's Test connection action to verify IMAP folder discovery and SMTP TLS/AUTH without sending a message.\n- [ ] Open the mailbox and confirm Inbox message listing.
 - [ ] Send a message to an external mailbox and verify receipt.
 - [ ] Reply from the external mailbox and verify it appears in Inbox.
 - [ ] Confirm the Sent copy appears in the configured Sent folder. Set `MAIL_FOLDER_SENT` if the provider uses a non-standard folder path.
