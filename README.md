@@ -43,6 +43,6 @@ The app expects the provider to expose standard IMAP and SMTP services. No Crane
 
 ## Security and operational notes
 
-Use HTTPS, keep `.env` outside the web root, use a unique 32-byte app key, and restrict admin access. The application does not log mailbox passwords or SMTP/IMAP authentication exchanges. Rotate a mailbox password at the provider and update it in the encrypted mailbox record when changing credentials. Do not expose downloaded attachments inline. Configure PHP upload/post limits to match the app's attachment limits.
+Use HTTPS, keep `.env` outside the web root, use a unique 32-byte app key, and restrict admin access. The application does not log mailbox passwords or SMTP/IMAP authentication exchanges. For manual mailboxes, change a mailbox password at the provider first, then use the admin credential-update form to store the new password encrypted in the application. Do not expose downloaded attachments inline. Configure PHP upload/post limits to match the app's attachment limits.
 
 Still outstanding: self-service password reset, inline CID images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
