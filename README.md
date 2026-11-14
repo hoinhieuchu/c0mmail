@@ -4,7 +4,7 @@ Lightweight PHP MVC webmail for cPanel/shared hosting. MariaDB/MySQL via PDO; va
 
 ## Milestone 1 foundation
 
-Local authentication, admin/member roles, a replaceable identity provider interface for future OIDC, mailbox administration, AES-256-GCM encrypted mailbox credentials, manual provisioning, and a configurable (provisional) CraneMail provisioning adapter.
+Local authentication, admin/member roles, account password changes with current-password verification, a replaceable identity provider interface for future OIDC, mailbox administration, AES-256-GCM encrypted mailbox credentials, manual provisioning, and a configurable (provisional) CraneMail provisioning adapter.
 
 ## Milestone 2 webmail engine
 
@@ -45,4 +45,4 @@ The app expects the provider to expose standard IMAP and SMTP services. No Crane
 
 Use HTTPS, keep `.env` outside the web root, use a unique 32-byte app key, and restrict admin access. The application does not log mailbox passwords or SMTP/IMAP authentication exchanges. Rotate a mailbox password at the provider and update it in the encrypted mailbox record when changing credentials. Do not expose downloaded attachments inline. Configure PHP upload/post limits to match the app's attachment limits.
 
-Still outstanding: password change/reset UI, inline CID images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
+Still outstanding: self-service password reset, inline CID images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
