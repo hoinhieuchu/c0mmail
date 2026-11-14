@@ -45,6 +45,7 @@ final class WebmailController
  {
   $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);
   $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$this->uploads()];
+  if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
   $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;
  }
  public function createFolder(int $id):void{$user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$name=trim((string)($_POST['name']??''));if(strlen($name)>100)throw new \InvalidArgumentException('Folder name is too long.');$this->webmail->createFolder($creds,$name);header('Location: /mail/'.$id.'?folder='.rawurlencode($name));exit;}
