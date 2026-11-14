@@ -9,4 +9,6 @@ final class UserRepository
     public function findById(int $id):?array{$s=$this->db->prepare('SELECT id,email,display_name,role,status FROM users WHERE id=?');$s->execute([$id]);return $s->fetch()?:null;}
     public function allMembers():array{return $this->db->query("SELECT id,email,display_name FROM users WHERE status='active' ORDER BY email")->fetchAll();}
     public function create(string $email,string $name,string $hash,string $role='member'):int{$s=$this->db->prepare('INSERT INTO users(email,display_name,password_hash,role) VALUES(?,?,?,?)');$s->execute([$email,$name,$hash,$role]);return (int)$this->db->lastInsertId();}
+    public function passwordHashForId(int $id):?string{$s=$this->db->prepare('SELECT password_hash FROM users WHERE id=? AND status=\\'active\\'');$s->execute([$id]);$hash=$s->fetchColumn();return is_string($hash)?$hash:null;}
+    public function updatePasswordHash(int $id,string $expectedHash,string $newHash):bool{$s=$this->db->prepare('UPDATE users SET password_hash=? WHERE id=? AND password_hash=? AND status=\\'active\\'');$s->execute([$newHash,$id,$expectedHash]);return $s->rowCount()===1;}
 }
