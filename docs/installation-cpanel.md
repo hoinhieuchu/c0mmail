@@ -8,7 +8,7 @@
 6. Generate the key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
 7. Import `database/migrations/001_initial_schema.sql` using phpMyAdmin.
 8. Create the administrator over Terminal/SSH: `php bin/create-admin.php admin@example.com 'minimum-14-character-password'`.
-9. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP upload limits (`upload_max_filesize`, `post_max_size`) are at least the application attachment limits.
+9. Run `php bin/check-requirements.php` from Terminal/SSH and resolve every `[FAIL]`. It checks the PHP runtime, extensions, encryption key, HTTPS and required configuration; it does not test live IMAP/SMTP connectivity.\n10. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP upload limits (`upload_max_filesize`, `post_max_size`) are at least the application attachment limits.
 
 ## Mail protocol values
 
