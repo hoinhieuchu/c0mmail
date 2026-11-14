@@ -27,7 +27,7 @@ $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
-$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);
+$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);$accountController=new AccountController($auth,$users,$view,new PasswordPolicy());
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $credentialService=new MailboxCredentialService($mailboxes,$config);$mime=new MimeMessageBuilder();
@@ -36,7 +36,7 @@ $webmailController=new WebmailController($auth,$view,$credentialService,$webmail
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
 $router->get('/login',fn()=>$authController->showLogin());$router->post('/login',fn()=>$authController->login());$router->post('/logout',fn()=>$authController->logout());
-$router->get('/dashboard',fn()=>$dashboard->index());
+$router->get('/dashboard',fn()=>$dashboard->index());\n$router->get('/account/password',fn()=>$accountController->showPassword());$router->post('/account/password',fn()=>$accountController->updatePassword());
 $router->get('/mail/{id}',fn(array $p)=>$webmailController->index((int)$p['id']));
 $router->get('/mail/{id}/message/{uid}',fn(array $p)=>$webmailController->showMessage((int)$p['id'],(int)$p['uid']));
 $router->get('/mail/{id}/download/{uid}',fn(array $p)=>$webmailController->download((int)$p['id'],(int)$p['uid']));
