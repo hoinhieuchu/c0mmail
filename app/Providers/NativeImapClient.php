@@ -64,14 +64,15 @@ final class NativeImapClient implements ImapClientInterface
  private function decode(string $v):string
  {
   $parts=imap_mime_header_decode($v);if(!$parts)return $v;$out='';
-  foreach($parts as $part){$text=(string)$part->text;$charset=strtoupper(trim((string)($part->charset??'DEFAULT')));if(!in_array($charset,['DEFAULT','UTF-8','US-ASCII','ASCII'],true)&&function_exists('iconv')){$converted=@iconv($charset,'UTF-8//IGNORE',$text);if($converted!==false)$text=$converted;}$out.=$text;}
+  foreach($parts as $part){$text=(string)$part->text;$charset=strtoupper(trim((string)($part->charset??'DEFAULT')));if(!in_array($charset,['DEFAULT','UTF-8','US-ASCII','ASCII'],true)){if(function_exists('iconv')){$converted=@iconv($charset,'UTF-8//IGNORE',$text);if($converted!==false)$text=$converted;}elseif(function_exists('mb_convert_encoding')){$text=mb_convert_encoding($text,'UTF-8',$charset);}}$out.=$text;}
   return $out;
  }
  private function toUtf8(string $text,object $part):string
  {
   $charset='';foreach(($part->parameters??[]) as $parameter){if(strtolower((string)($parameter->attribute??''))==='charset'){$charset=trim((string)$parameter->value);break;}}
-  if($charset===''||in_array(strtoupper($charset),['UTF-8','US-ASCII','ASCII','DEFAULT'],true)||!function_exists('iconv'))return $text;
-  $converted=@iconv($charset,'UTF-8//IGNORE',$text);return $converted===false?$text:$converted;
+  if($charset===''||in_array(strtoupper($charset),['UTF-8','US-ASCII','ASCII','DEFAULT'],true)){return $text;}
+  if(function_exists('iconv')){$converted=@iconv($charset,'UTF-8//IGNORE',$text);return $converted===false?$text:$converted;}
+  return function_exists('mb_convert_encoding')?mb_convert_encoding($text,'UTF-8',$charset):$text;
  }
  private function walk(int $uid,object $s,string $prefix,string &$plain,string &$html,array &$atts):void
  {
