@@ -36,6 +36,20 @@ curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /tmp/c0mmail-passwo
 grep -q 'Your password has been updated' /tmp/c0mmail-password-result
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/mailboxes -o /tmp/c0mmail-admin.html
 grep -q 'Mailbox administration' /tmp/c0mmail-admin.html
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/members -o /tmp/c0mmail-members.html
+grep -q 'Member administration' /tmp/c0mmail-members.html
+member_email='ci-member@example.test'
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /dev/null -X POST http://127.0.0.1:8080/admin/members \
+  --data-urlencode "_csrf=$csrf" --data-urlencode "email=$member_email" \
+  --data-urlencode 'display_name=CI Member' --data-urlencode 'password=ci-member-password-123456'
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/members -o /tmp/c0mmail-members-created.html
+grep -q "$member_email" /tmp/c0mmail-members-created.html
+member_id=$(grep -oP 'action="/admin/members/\K[0-9]+(?=/status)' /tmp/c0mmail-members-created.html | head -n1)
+test -n "$member_id"
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /dev/null -X POST "http://127.0.0.1:8080/admin/members/$member_id/status" \
+  --data-urlencode "_csrf=$csrf" --data-urlencode 'status=suspended'
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/members -o /tmp/c0mmail-members-suspended.html
+grep -q 'suspended' /tmp/c0mmail-members-suspended.html
 curl -fsS -b /tmp/c0mmail-cookies -D /tmp/c0mmail-logout-headers -o /dev/null \
   -X POST http://127.0.0.1:8080/logout --data-urlencode "_csrf=$csrf"
 grep -qi '^Location: /login' /tmp/c0mmail-logout-headers
