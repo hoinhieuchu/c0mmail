@@ -34,7 +34,8 @@ test('environment example exposes separate valid IMAP and SMTP settings',functio
  $config=Config::load(dirname(__DIR__).'/.env.example');
  same('ssl',$config->get('MAIL_IMAP_ENCRYPTION'));
  same('starttls',$config->get('MAIL_SMTP_ENCRYPTION'));
- same('20',$config->get('MAIL_SMTP_TIMEOUT'));\n same('false',$config->get('MAIL_ALLOW_INSECURE_AUTH'));
+ same('20',$config->get('MAIL_SMTP_TIMEOUT'));
+ same('false',$config->get('MAIL_ALLOW_INSECURE_AUTH'));
  same('25',$config->get('MAIL_PAGE_SIZE'));
  same('INBOX',$config->get('MAIL_FOLDER_INBOX'));
 });
