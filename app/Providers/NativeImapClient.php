@@ -8,7 +8,7 @@ final class NativeImapClient implements ImapClientInterface
  private string $base;
  private int $maxAttachmentBytes;
  private array $folderRoles;
- public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760,array $folderRoles=[])
+ public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760,array $folderRoles=[],int $timeout=20)
  {
   if(!function_exists('imap_open'))throw new \RuntimeException('PHP IMAP extension is required on this hosting account.');
   if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid IMAP port.');
