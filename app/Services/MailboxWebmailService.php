@@ -45,11 +45,6 @@ final class MailboxWebmailService
   if(count($metadata)+count($newFiles)>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
   $maxFile=max(1,(int)$this->config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'));
   $maxTotal=max(1,(int)$this->config->get('MAIL_ATTACHMENT_TOTAL_MAX_BYTES','20971520'));
-  $knownTotal=0;
-  foreach($metadata as $attachment){
-   $size=(int)($attachment['size']??0);$knownTotal+=$size;
-   if($size>$maxFile||$knownTotal>$maxTotal)throw new \InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
-  }
   $preserved=$this->preserveAttachments($credentials,$folder,$uid,$metadata);
   $all=array_merge($preserved,$newFiles);$total=0;
   foreach($all as $attachment){
@@ -61,7 +56,12 @@ final class MailboxWebmailService
  }
  private function preserveAttachments(array $credentials,string $folder,int $uid,array $metadata):array
  {
-  $files=[];foreach($metadata as $attachment){$file=$this->download($credentials,$folder,$uid,(string)$attachment['part']);$files[]=['name'=>$file['name'],'type'=>$file['type'],'data'=>$file['data']];}
+  $files=[];$total=0;$maxFile=max(1,(int)$this->config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'));$maxTotal=max(1,(int)$this->config->get('MAIL_ATTACHMENT_TOTAL_MAX_BYTES','20971520'));
+  foreach($metadata as $attachment){
+   $file=$this->download($credentials,$folder,$uid,(string)$attachment['part']);$size=strlen($file['data']);$total+=$size;
+   if($size>$maxFile||$total>$maxTotal)throw new \InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
+   $files[]=['name'=>$file['name'],'type'=>$file['type'],'data'=>$file['data']];
+  }
   return $files;
  }
  public function send(array $credentials,array $message):bool
