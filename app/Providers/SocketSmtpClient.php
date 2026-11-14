@@ -5,10 +5,14 @@ use App\Contracts\SmtpClientInterface;
 use App\Services\MimeMessageBuilder;
 final class SocketSmtpClient implements SmtpClientInterface
 {
- public function __construct(private string $host,private int $port,private string $encryption,private string $username,private string $password,private int $timeout=20,private ?MimeMessageBuilder $mime=null,private bool $allowInsecureAuth=false){if($port<1||$port>65535)throw new \\InvalidArgumentException('Invalid SMTP port.');if($timeout<1||$timeout>120)throw new \\InvalidArgumentException('Invalid SMTP timeout.');}
+ public function __construct(private string $host,private int $port,private string $encryption,private string $username,private string $password,private int $timeout=20,private ?MimeMessageBuilder $mime=null,private bool $allowInsecureAuth=false)
+ {
+  if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid SMTP port.');
+  if($timeout<1||$timeout>120)throw new \InvalidArgumentException('Invalid SMTP timeout.');
+ }
  public function send(array $message):void
  {
-  if(preg_match('/[\r\n]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
+  if($this->host===''||preg_match('/[\s{}\/\\\\\x00]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
   if(!in_array($this->encryption,['ssl','starttls','none'],true))throw new \InvalidArgumentException('Unsupported SMTP encryption mode.');
   if($this->username!==''&&$this->encryption==='none'&&!$this->allowInsecureAuth)throw new \RuntimeException('SMTP authentication over an unencrypted connection is disabled. Enable SSL/TLS or explicitly allow insecure authentication only for a trusted private mail server.');
   $remote=($this->encryption==='ssl'?'ssl://':'tcp://').$this->host.':'.$this->port;$errno=0;$errstr='';
