@@ -10,6 +10,23 @@ final class SocketSmtpClient implements SmtpClientInterface
   if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid SMTP port.');
   if($timeout<1||$timeout>120)throw new \InvalidArgumentException('Invalid SMTP timeout.');
  }
+ public function verify():void
+ {
+  if($this->host===''||preg_match('/[\s{}\/\\\\\x00]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
+  if(!in_array($this->encryption,['ssl','starttls','none'],true))throw new \InvalidArgumentException('Unsupported SMTP encryption mode.');
+  if($this->username!==''&&$this->encryption==='none'&&!$this->allowInsecureAuth)throw new \RuntimeException('SMTP authentication over an unencrypted connection is disabled.');
+  $socketHost=filter_var($this->host,FILTER_VALIDATE_IP,FILTER_FLAG_IPV6)!==false?'['.$this->host.']':$this->host;
+  $remote=($this->encryption==='ssl'?'ssl://':'tcp://').$socketHost.':'.$this->port;$errno=0;$errstr='';
+  $socket=@stream_socket_client($remote,$errno,$errstr,$this->timeout,STREAM_CLIENT_CONNECT,stream_context_create(['ssl'=>['verify_peer'=>true,'verify_peer_name'=>true]]));
+  if(!$socket)throw new \RuntimeException('SMTP connection failed ('.$errno.').');
+  stream_set_timeout($socket,$this->timeout);
+  try{
+   $this->expect($socket,[220]);$this->command($socket,'EHLO c0m.me',[250]);
+   if($this->encryption==='starttls'){$this->command($socket,'STARTTLS',[220]);if(!stream_socket_enable_crypto($socket,true,STREAM_CRYPTO_METHOD_TLS_CLIENT))throw new \RuntimeException('SMTP TLS negotiation failed.');$this->command($socket,'EHLO c0m.me',[250]);}
+   if($this->username!==''){$this->command($socket,'AUTH LOGIN',[334]);$this->command($socket,base64_encode($this->username),[334]);$this->command($socket,base64_encode($this->password),[235]);}
+   $this->command($socket,'QUIT',[221]);
+  }finally{fclose($socket);}
+ }
  public function send(array $message):void
  {
   if($this->host===''||preg_match('/[\s{}\/\\\\\x00]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
