@@ -13,7 +13,7 @@ final class AdminMailboxController
     public function index():void
     {
         $this->auth->requireAdmin();$created=$_SESSION['created_mailbox']??null;unset($_SESSION['created_mailbox']);
-        $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'created'=>$created,'providerName'=>$this->providerName]);
+        $notice=$_SESSION['mailbox_notice']??null;unset($_SESSION['mailbox_notice']);$this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'notice'=>$notice,'created'=>$created,'providerName'=>$this->providerName]);
     }
     public function create():void
     {
@@ -26,7 +26,7 @@ final class AdminMailboxController
             $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password];
             header('Location: /admin/mailboxes');exit;
         } catch (\Throwable $e) {
-            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'created'=>null,'providerName'=>$this->providerName]);
+            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'notice'=>null,'created'=>null,'providerName'=>$this->providerName]);
         }
     }
     public function activateManual(int $id):void
@@ -41,4 +41,16 @@ final class AdminMailboxController
         if($this->providerName==='manual'&&($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Confirm external suspension first.');}
         $this->service->suspend($id);header('Location: /admin/mailboxes');exit;
     }
+    public function updateCredentials(int $id):void
+    {
+        $this->auth->requireAdmin();Csrf::verify();
+        if($this->providerName!=='manual'||($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Change the mailbox password at the provider first, then confirm the update here.');}
+        try{
+            $password=(string)($_POST['password']??'');
+            $this->service->updateManualPassword($id,$password);
+            $_SESSION['mailbox_notice']='Encrypted mailbox credentials updated. Verify IMAP and SMTP access with this mailbox.';
+        }catch(\Throwable $e){$_SESSION['mailbox_notice']='Credential update failed: '.$e->getMessage();}
+        header('Location: /admin/mailboxes');exit;
+    }
+
 }
