@@ -34,8 +34,9 @@ final class NativeImapClient implements ImapClientInterface
  {
   $this->select($folder);$overview=imap_fetch_overview($this->stream,(string)$uid,FT_UID);if(!$overview||!isset($overview[0]))throw new \RuntimeException('Message not found.');
   $structure=imap_fetchstructure($this->stream,$uid,FT_UID);$plain='';$html='';$attachments=[];if($structure)$this->walk($uid,$structure,'',$plain,$html,$attachments);
+  $header=imap_fetchheader($this->stream,$uid,FT_UID);$unfolded=preg_replace("/\\r?\\n[ \\t]+/"," ",$header?:'');$draftBcc='';if(preg_match('/^X-C0m-Draft-Bcc:\\s*(.+)$/mi',$unfolded,$bccMatch))$draftBcc=$this->decode(trim($bccMatch[1]));
   imap_setflag_full($this->stream,(string)$uid,'\\Seen',ST_UID);$v=$overview[0];
-  return ['uid'=>$uid,'subject'=>$this->decode((string)($v->subject??'')),'from'=>$this->decode((string)($v->from??'')),'to'=>$this->decode((string)($v->to??'')),'cc'=>$this->decode((string)($v->cc??'')),'date'=>(string)($v->date??''),'body'=>$plain!==''?$plain:strip_tags($html),'html'=>$html,'attachments'=>$attachments];
+  return ['uid'=>$uid,'subject'=>$this->decode((string)($v->subject??'')),'from'=>$this->decode((string)($v->from??'')),'to'=>$this->decode((string)($v->to??'')),'cc'=>$this->decode((string)($v->cc??'')),'bcc'=>$draftBcc,'date'=>(string)($v->date??''),'body'=>$plain!==''?$plain:strip_tags($html),'html'=>$html,'attachments'=>$attachments];
  }
  public function setFlag(string $folder,int $uid,string $flag,bool $enabled):void
  {
