@@ -47,7 +47,7 @@ foreach(['MAIL_IMAP_ENCRYPTION','MAIL_SMTP_ENCRYPTION'] as $name){
     $severity=$mode==='none'&&$appEnv!=='production'?'warning':'error';
     $report("Configuration: {$name} uses SSL/TLS",$mode==='ssl'||$mode==='starttls',$severity);
 }
-$allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
+$imapTimeout=(int)$config->get('MAIL_IMAP_TIMEOUT','20');\n$report('MAIL_IMAP_TIMEOUT is between 1 and 120 seconds',$imapTimeout>=1&&$imapTimeout<=120);\n$allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
 $report('Insecure SMTP authentication is disabled in production',!($appEnv==='production'&&$allowInsecure));
 
 echo "\n";
