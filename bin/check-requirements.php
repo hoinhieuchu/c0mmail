@@ -44,7 +44,8 @@ foreach(['MAIL_IMAP_PORT','MAIL_SMTP_PORT'] as $name){
 }
 foreach(['MAIL_IMAP_ENCRYPTION','MAIL_SMTP_ENCRYPTION'] as $name){
     $mode=strtolower((string)$config->get($name,''));
-    $report("Configuration: {$name} uses SSL/TLS",$mode==='ssl'||$mode==='starttls',$mode==='none'?'warning':'error');
+    $severity=$mode==='none'&&$appEnv!=='production'?'warning':'error';
+    $report("Configuration: {$name} uses SSL/TLS",$mode==='ssl'||$mode==='starttls',$severity);
 }
 $allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
 $report('Insecure SMTP authentication is disabled in production',!($appEnv==='production'&&$allowInsecure));
