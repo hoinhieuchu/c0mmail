@@ -31,7 +31,7 @@ test('MIME builder folds long UTF-8 subjects and limits recipients',function(){
  $headers=explode("\r\n\r\n",$raw,2)[0];
  same(true,str_contains($headers,'=?UTF-8?B?'));
  same(false,(bool)preg_match('/^Bcc:/mi',$headers));
- same(true,(bool)preg_match('/^Message-ID: <[a-f0-9]+@example\\.test>$/mi',$headers));
+ same(true,(bool)preg_match('/^Message-ID: <[a-f0-9]+@example\\.test>\\r?$/mi',$headers));
  foreach(explode("\r\n",$headers) as $line){
   if(str_starts_with($line,'Subject:')||str_starts_with($line,' '))same(true,strlen($line)<=78);
  }
