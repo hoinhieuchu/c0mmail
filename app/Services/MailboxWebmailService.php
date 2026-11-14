@@ -48,14 +48,14 @@ final class MailboxWebmailService
   $knownTotal=0;
   foreach($metadata as $attachment){
    $size=(int)($attachment['size']??0);$knownTotal+=$size;
-   if($size<1||$size>$maxFile||$knownTotal>$maxTotal)throw new \InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
+   if($size>$maxFile||$knownTotal>$maxTotal)throw new \InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
   }
   $preserved=$this->preserveAttachments($credentials,$folder,$uid,$metadata);
   $all=array_merge($preserved,$newFiles);$total=0;
   foreach($all as $attachment){
    $size=array_key_exists('data',$attachment)?strlen((string)$attachment['data']):(int)(filesize((string)($attachment['path']??''))?:0);
    $total+=$size;
-   if($size<1||$size>$maxFile||$total>$maxTotal)throw new \InvalidArgumentException('Combined draft attachments exceed the configured size limits.');
+   if($size>$maxFile||$total>$maxTotal)throw new \InvalidArgumentException('Combined draft attachments exceed the configured size limits.');
   }
   return $all;
  }
