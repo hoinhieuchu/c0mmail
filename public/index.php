@@ -32,11 +32,11 @@ header_remove('X-Powered-By');
 $config=Config::load(dirname(__DIR__).'/.env');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$config->get('APP_ENV')==='production','samesite'=>'Lax']);session_start();}
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
-$auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
+$auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');$loginRateLimiter=new LoginRateLimiter($db,$config);
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
-$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);$passwordPolicy=new PasswordPolicy();$accountController=new AccountController($auth,$users,$view,$passwordPolicy);$adminMembers=new AdminMemberController($auth,$users,$view,$passwordPolicy);
+$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view,$loginRateLimiter);$passwordPolicy=new PasswordPolicy();$accountController=new AccountController($auth,$users,$view,$passwordPolicy);$adminMembers=new AdminMemberController($auth,$users,$view,$passwordPolicy);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $credentialService=new MailboxCredentialService($mailboxes,$config);$mime=new MimeMessageBuilder();
