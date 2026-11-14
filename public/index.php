@@ -22,6 +22,12 @@ use App\Services\MailboxWebmailService;
 use App\Services\MimeMessageBuilder;
 use App\Services\PasswordPolicy;
 require dirname(__DIR__).'/app/bootstrap.php';
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:");
+header_remove('X-Powered-By');
 $config=Config::load(dirname(__DIR__).'/.env');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$config->get('APP_ENV')==='production','samesite'=>'Lax']);session_start();}
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
