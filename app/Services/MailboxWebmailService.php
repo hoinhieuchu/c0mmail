@@ -52,5 +52,5 @@ final class MailboxWebmailService
   try{$folders=$this->folders($credentials);$sent=$this->roleFolder($folders,'sent');if($sent!==null){$imap=$this->transports->imap($credentials);try{$imap->append($sent,$raw,'\\Seen');}finally{$imap->close();}}}
   catch(\Throwable $e){error_log('Sent-copy append failed; SMTP delivery already accepted.');}
  }
- private function roleFolder(array $folders,string $role):?string{foreach($folders as $f)if(($f['role']??'')===$role)return $f['path'];return null;}
+ private function roleFolder(array $folders,string $role):?string{$configured=trim((string)$this->config->get('MAIL_FOLDER_'.strtoupper($role),''));if($configured!==''){foreach($folders as $f)if(strcasecmp((string)$f['path'],$configured)===0)return $f['path'];}foreach($folders as $f)if(($f['role']??'')===$role)return $f['path'];return null;}
 }
