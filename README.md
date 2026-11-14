@@ -37,7 +37,7 @@ PHP 8.1+ with PDO MySQL, OpenSSL, IMAP extension, fileinfo and sessions. MariaDB
 - `MAIL_PAGE_SIZE`: messages per page (maximum 50).
 - `MAIL_ATTACHMENT_MAX_BYTES`, `MAIL_ATTACHMENT_TOTAL_MAX_BYTES`: per-file and per-message upload limits.
 
-The app expects the provider to expose standard IMAP and SMTP services. No CraneMail HTTP API is guessed for message operations. The old provisioning HTTP adapter remains disabled unless explicitly configured and verified against official CraneMail documentation.
+The app expects the provider to expose standard IMAP and SMTP services. No CraneMail HTTP API is guessed. Provisioning, suspension and deletion through CraneMail are deliberately disabled until its official API contract and credentials are supplied and verified.
 
 ## Tests
 
