@@ -46,7 +46,7 @@ curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/members -o /tmp/c0
 grep -q "$member_email" /tmp/c0mmail-members-created.html
 curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -D /tmp/c0mmail-mailbox-create-headers -o /tmp/c0mmail-mailbox-created.html \
   -X POST http://127.0.0.1:8080/admin/mailboxes \
-  --data-urlencode "_csrf=$csrf" --data-urlencode "user_id=$(grep -oP 'action="/admin/members/\\K[0-9]+' /tmp/c0mmail-members-created.html | head -n1)" \
+  --data-urlencode "_csrf=$csrf" --data-urlencode "user_id=$(grep -oP 'action="/admin/members/\K[0-9]+' /tmp/c0mmail-members-created.html | head -n1)" \
   --data-urlencode 'local_part=ci-mailbox' --data-urlencode 'display_name=CI Mailbox' \
   --data-urlencode 'password=ci-mailbox-password-123456'
 grep -q 'ci-mailbox-password-123456' /tmp/c0mmail-mailbox-created.html
