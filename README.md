@@ -11,7 +11,7 @@ Local authentication, admin/member roles, account password changes with current-
 - Native PHP IMAP adapter: folder discovery, message listing, UID-based pagination, text search, MIME body/attachment parsing, read/unread and star flags, move, delete/expunge, custom folder creation, APPEND for drafts and Sent copies.
 - Socket SMTP adapter: SMTP AUTH LOGIN, implicit TLS or STARTTLS, message delivery, To/CC/BCC, UTF-8 subject/body, MIME attachments and dot-stuffing.
 - Provider-neutral IMAP/SMTP interfaces; mailbox passwords are decrypted only for a request and are never stored in the PHP session or logged.
-- Browser UI for folders, message reading, sandboxed HTML email preview with an allowlist sanitizer, compose, reply, forward, CC/BCC, attachments, draft saving, search and pagination.
+- Browser UI for folders, message reading, sandboxed HTML email preview with an allowlist sanitizer, compose, reply, forward, CC/BCC, attachments, draft saving and reopening/editing with attachment and private BCC preservation, search and pagination.
 - Attachment upload defaults: 10 MiB per file, 20 MiB total, maximum five files. Executable/script/web page file extensions are blocked. Downloads are forced as attachments.
 
 ## Requirements
