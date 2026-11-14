@@ -20,7 +20,7 @@ Controllers use `MemberProviderInterface`. The current local session provider is
 
 ## Mail infrastructure and transport
 
-CraneMail is an external mailbox host, not a webmail UI dependency. `ImapClientInterface` and `SmtpClientInterface` isolate the engine from any specific mail host. `NativeImapClient` uses PHP's IMAP extension with TLS certificate verification. `SocketSmtpClient` implements SMTP greeting/EHLO, optional STARTTLS or implicit TLS, AUTH LOGIN, envelope recipients, DATA, MIME transfer and dot-stuffing.
+CraneMail is an external mailbox host, not a webmail UI dependency. `ImapClientInterface` and `SmtpClientInterface` isolate the engine from any specific mail host. `NativeImapClient` uses PHP's IMAP extension with TLS certificate verification and configurable open/read/write timeouts. `SocketSmtpClient` implements SMTP greeting/EHLO, optional STARTTLS or implicit TLS, AUTH LOGIN, envelope recipients, DATA, MIME transfer and dot-stuffing.
 
 The configured mailbox email/password authenticate to both protocols. The password is AES-256-GCM encrypted in the mailboxes table and decrypted only in request memory. It is not stored in a PHP session or written to application logs. During manual provisioning, the initial password is shown only in the immediate no-store admin response, not in a session flash. SMTP AUTH commands and IMAP credentials are not logged.
 
@@ -34,7 +34,7 @@ HTML message bodies are processed through an allowlist sanitizer and displayed i
 
 ## Synchronization model
 
-The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged as a generic event and does not claim the delivery failed.
+The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged without secrets and shown to the user as a warning; the UI explicitly advises against resending a message already accepted by SMTP. Draft-send cleanup failures are also surfaced so users do not accidentally send duplicates.
 
 ## CraneMail provisioning boundary
 
