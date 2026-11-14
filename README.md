@@ -24,7 +24,7 @@ PHP 8.1+ with PDO MySQL, OpenSSL, IMAP extension, fileinfo and sessions. MariaDB
 2. Generate the app key: `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
 3. Import `database/migrations/001_initial_schema.sql`.
 4. Point the domain document root to `public/`; follow [cPanel installation](docs/installation-cpanel.md).
-5. Create an administrator using `php bin/create-admin.php admin@example.com 'A-strong-password-14'`.
+5. Run the deployment preflight: `php bin/check-requirements.php`. Resolve every `[FAIL]` before opening the app to users. The script checks PHP extensions, APP_KEY, HTTPS and mail/database configuration; it does not test network connectivity.\n6. Create an administrator using `php bin/create-admin.php admin@example.com 'A-strong-password-14'`.
 
 ## Mail transport configuration
 
