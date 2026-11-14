@@ -8,6 +8,7 @@ use PDO;
 final class LoginRateLimiter
 {
     private string $key;
+    private bool $ipWideEnabled;
 
     public function __construct(private PDO $db,Config $config)
     {
@@ -15,6 +16,7 @@ final class LoginRateLimiter
         $key=str_starts_with($raw,'base64:')?base64_decode(substr($raw,7),true):false;
         if(!is_string($key)||strlen($key)!==32)throw new \RuntimeException('Invalid application encryption key.');
         $this->key=hash_hmac('sha256','c0mmail/login-rate-limit/v1',$key,true);
+        $this->ipWideEnabled=strtolower((string)$config->get('LOGIN_RATE_LIMIT_IP_WIDE','false'))==='true';
     }
 
     public function isBlocked(string $email,string $ip):bool
