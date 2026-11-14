@@ -25,7 +25,8 @@ final class LoginRateLimiter
         if($pair>=10)return true;
         $byEmail=$this->count('email_hash=?',[$emailHash]);
         if($byEmail>=30)return true;
-        return false;
+        $byIp=$this->count('ip_hash=?',[$ipHash]);
+        return $byIp>=120;
     }
 
     public function recordFailure(string $email,string $ip):void
