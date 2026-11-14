@@ -11,4 +11,5 @@ final class MailboxRepository
     public function findForUser(int $id,int $userId):?array{$s=$this->db->prepare('SELECT * FROM mailboxes WHERE id=? AND user_id=?');$s->execute([$id,$userId]);return $s->fetch()?:null;}
     public function find(int $id):?array{$s=$this->db->prepare('SELECT * FROM mailboxes WHERE id=?');$s->execute([$id]);return $s->fetch()?:null;}
     public function setStatus(int $id,string $status):void{$s=$this->db->prepare('UPDATE mailboxes SET status=? WHERE id=?');$s->execute([$status,$id]);}
+    public function updateCredentials(int $id,string $ciphertext,string $nonce,string $tag):void{$s=$this->db->prepare('UPDATE mailboxes SET password_ciphertext=?,password_nonce=?,password_tag=? WHERE id=?');$s->execute([$ciphertext,$nonce,$tag,$id]);}
 }
