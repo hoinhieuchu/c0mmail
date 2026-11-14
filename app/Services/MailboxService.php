@@ -39,6 +39,17 @@ final class MailboxService
         elseif($m['provider']!=='manual')throw new \RuntimeException('Provider mailbox ID is missing; refusing to claim remote suspension.');
         $this->repo->setStatus($id,'suspended');
     }
+    public function updateManualPassword(int $id,string $password):void
+    {
+        if(strlen($password)<12)throw new \InvalidArgumentException('Mailbox password must be at least 12 characters.');
+        $mailbox=$this->repo->find($id);
+        if(!$mailbox||$mailbox['provider']!=='manual'||$mailbox['status']==='deleted')throw new \RuntimeException('Only existing manual mailboxes can have stored credentials updated here.');
+        $key=$this->encryptionKey();$nonce=random_bytes(12);$tag='';
+        $cipher=openssl_encrypt($password,'aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);
+        if($cipher===false)throw new \RuntimeException('Mailbox password encryption failed.');
+        $this->repo->updateCredentials($id,base64_encode($cipher),bin2hex($nonce),bin2hex($tag));
+    }
+
     private function encryptionKey():string
     {
         $raw=$this->config->required('APP_KEY');if(!str_starts_with($raw,'base64:'))throw new \RuntimeException('APP_KEY must use base64: prefix.');
