@@ -30,8 +30,10 @@ try{
  $download=$imap->downloadPart('INBOX',$uid,$read['attachments'][0]['part']);check(str_contains($download['data'],'real attachment test'),'MIME attachment downloaded and decoded');
  $imap->setFlag('INBOX',$uid,'flagged',true);$imap->move('INBOX',$uid,'Milestone2Integration');$moved=$imap->messages('Milestone2Integration',1,25);check($moved['total']>0,'IMAP message moved to custom folder');
  $movedUid=(int)$moved['messages'][0]['uid'];$imap->delete('Milestone2Integration',$movedUid);check($imap->messages('Milestone2Integration',1,25)['total']===0,'IMAP message deleted and expunged');
- $webmail->saveDraft(['email'=>$email,'password'=>$pass],['from'=>$email,'to'=>'','cc'=>'','bcc'=>'','subject'=>'Saved draft','body'=>'Draft persisted on IMAP']);
- check($imap->messages('Drafts',1,25)['total']>0,'Draft saved to the real IMAP Drafts folder');
+ $draftSubject='Editable draft '.bin2hex(random_bytes(3));$draftPayload=['from'=>$email,'to'=>'','cc'=>'','bcc'=>'','subject'=>$draftSubject,'body'=>'Draft persisted on IMAP','attachments'=>[['name'=>'draft.txt','path'=>$tmp,'type'=>'text/plain']]];
+ $webmail->saveDraft(['email'=>$email,'password'=>$pass],$draftPayload);$drafts=$imap->messages('Drafts',1,25,$draftSubject);check($drafts['total']>0,'Draft saved to the real IMAP Drafts folder');
+ $draftUid=(int)$drafts['messages'][0]['uid'];$webmail->replaceDraft(['email'=>$email,'password'=>$pass],'Drafts',$draftUid,['from'=>$email,'to'=>'','cc'=>'','bcc'=>'','subject'=>$draftSubject.' updated','body'=>'Updated draft']);$updated=$imap->messages('Drafts',1,25,$draftSubject.' updated');check($updated['total']>0,'Existing IMAP draft updated without losing draft state');
+ $updatedUid=(int)$updated['messages'][0]['uid'];$webmail->sendDraft(['email'=>$email,'password'=>$pass],'Drafts',$updatedUid,['from'=>$email,'to'=>$email,'cc'=>'','bcc'=>'','subject'=>'Sent from draft '.bin2hex(random_bytes(3)),'body'=>'Draft sent through SMTP']);check($imap->messages('Drafts',1,25,$draftSubject.' updated')['total']===0,'Sent draft removed from Drafts after SMTP acceptance');
  unlink($tmp);
 }finally{$imap->close();}
 echo "IMAP/SMTP integration suite passed.\n";
