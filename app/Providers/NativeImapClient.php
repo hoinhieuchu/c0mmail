@@ -61,15 +61,26 @@ final class NativeImapClient implements ImapClientInterface
  private function mailbox(string $folder):string{return $this->base.imap_utf7_encode($folder);}
  private function validFolder(string $f):bool{return $f!==''&&!preg_match('/[{}\x00-\x1F\x7F]/',$f);}
  private function role(string $f):string{foreach($this->folderRoles as $role=>$path){$path=trim((string)$path);if($path!==''&&strcasecmp($f,$path)===0)return (string)$role;}$v=strtolower($f);return match(true){$v==='inbox'=>'inbox',str_contains($v,'sent')=>'sent',str_contains($v,'draft')=>'drafts',str_contains($v,'spam')||str_contains($v,'junk')=>'spam',str_contains($v,'trash')||str_contains($v,'deleted')=>'trash',default=>'custom'};}
- private function decode(string $v):string{$parts=imap_mime_header_decode($v);return implode('',array_map(fn($p)=>$p->text,$parts?:[]));}
+ private function decode(string $v):string
+ {
+  $parts=imap_mime_header_decode($v);if(!$parts)return $v;$out='';
+  foreach($parts as $part){$text=(string)$part->text;$charset=strtoupper(trim((string)($part->charset??'DEFAULT')));if(!in_array($charset,['DEFAULT','UTF-8','US-ASCII','ASCII'],true)&&function_exists('iconv')){$converted=@iconv($charset,'UTF-8//IGNORE',$text);if($converted!==false)$text=$converted;}$out.=$text;}
+  return $out;
+ }
+ private function toUtf8(string $text,object $part):string
+ {
+  $charset='';foreach(($part->parameters??[]) as $parameter){if(strtolower((string)($parameter->attribute??''))==='charset'){$charset=trim((string)$parameter->value);break;}}
+  if($charset===''||in_array(strtoupper($charset),['UTF-8','US-ASCII','ASCII','DEFAULT'],true)||!function_exists('iconv'))return $text;
+  $converted=@iconv($charset,'UTF-8//IGNORE',$text);return $converted===false?$text:$converted;
+ }
  private function walk(int $uid,object $s,string $prefix,string &$plain,string &$html,array &$atts):void
  {
   foreach(($s->parts??[]) as $i=>$part){$n=$prefix===''?(string)($i+1):$prefix.'.'.($i+1);$disp=strtolower((string)($part->disposition??''));$name=$this->partName($part);
    if($name!==''||$disp==='attachment'){$atts[]=['part'=>$n,'name'=>$name?:'attachment','type'=>$this->type($part),'size'=>(int)($part->bytes??0)];continue;}
    if(isset($part->parts)){$this->walk($uid,$part,$n,$plain,$html,$atts);continue;}
-   $body=imap_fetchbody($this->stream,$uid,$n,FT_UID);$body=$this->decodeBody($body,(int)($part->encoding??0));if((int)$part->type===0)$plain.=$body;elseif((int)$part->type===1&&strtolower((string)($part->subtype??''))==='html')$html.=$body;
+   $body=imap_fetchbody($this->stream,$uid,$n,FT_UID);$body=$this->toUtf8($this->decodeBody($body,(int)($part->encoding??0)),$part);if((int)$part->type===0)$plain.=$body;elseif((int)$part->type===1&&strtolower((string)($part->subtype??''))==='html')$html.=$body;
   }
-  if(!$s->parts&&$prefix===''){$body=imap_body($this->stream,$uid,FT_UID);$plain=$this->decodeBody($body,(int)($s->encoding??0));}
+  if(!$s->parts&&$prefix===''){$body=imap_body($this->stream,$uid,FT_UID);$plain=$this->toUtf8($this->decodeBody($body,(int)($s->encoding??0)),$s);}
  }
  private function decodeBody(string $v,int $e):string{return match($e){3=>base64_decode($v,true)?:'',4=>quoted_printable_decode($v),default=>$v};}
  private function findPart(object $s,string $part):?object{$node=$s;foreach(explode('.',$part) as $i){$idx=(int)$i-1;if(!isset($node->parts[$idx]))return null;$node=$node->parts[$idx];}return $node;}
