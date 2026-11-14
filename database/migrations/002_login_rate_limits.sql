@@ -5,5 +5,6 @@ CREATE TABLE login_attempts (
  attempted_at DATETIME NOT NULL,
  INDEX idx_login_attempts_email_ip_time (email_hash,ip_hash,attempted_at),
  INDEX idx_login_attempts_email_time (email_hash,attempted_at),
+ INDEX idx_login_attempts_ip_time (ip_hash,attempted_at),
  INDEX idx_login_attempts_time (attempted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
