@@ -33,19 +33,19 @@ final class MailboxWebmailService
   $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);
   try{$imap->append($folder,$raw,'\\Draft');$imap->delete($folder,$uid);}finally{$imap->close();}
  }
- public function sendDraft(array $credentials,string $folder,int $uid,array $message):void
+ public function sendDraft(array $credentials,string $folder,int $uid,array $message):bool
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
   $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
-  $this->send($credentials,$message);$imap=$this->transports->imap($credentials);
-  try{$imap->delete($folder,$uid);}finally{$imap->close();}
+  $sentCopySaved=$this->send($credentials,$message);$imap=$this->transports->imap($credentials);
+  try{$imap->delete($folder,$uid);}finally{$imap->close();}return $sentCopySaved;
  }
  private function preserveAttachments(array $credentials,string $folder,int $uid,array $metadata):array
  {
   $files=[];foreach($metadata as $attachment){$file=$this->download($credentials,$folder,$uid,(string)$attachment['part']);$files[]=['name'=>$file['name'],'type'=>$file['type'],'data'=>$file['data']];}
   return $files;
  }
- public function send(array $credentials,array $message):void
+ public function send(array $credentials,array $message):bool
  {
   $message['from']=$credentials['email'];$raw=$this->mime->build($message);$message['raw']=$raw;
   $this->transports->smtp($credentials)->send($message);
