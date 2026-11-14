@@ -8,6 +8,7 @@ use App\Providers\CraneMailProvider;
 use App\Services\MimeMessageBuilder;
 use App\Services\HtmlEmailSanitizer;
 use App\Services\PasswordPolicy;
+use App\Providers\SocketSmtpClient;
 $count=0;
 function test(string $name,callable $fn):void{global $count;$fn();$count++;echo "PASS {$name}\n";}
 function same($expected,$actual):void{if($expected!==$actual)throw new RuntimeException('Expected '.var_export($expected,true).', got '.var_export($actual,true));}
