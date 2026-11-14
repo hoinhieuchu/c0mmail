@@ -18,7 +18,7 @@ This application is a webmail client. The mail provider remains responsible for 
 - [ ] Import `database/migrations/001_initial_schema.sql`.
 - [ ] Import `database/migrations/002_login_rate_limits.sql`.
 - [ ] Run `php bin/check-requirements.php` and resolve every failure.
-- [ ] Create the first administrator with `php bin/create-admin.php admin@example.com 'minimum-14-character-password'`.
+- [ ] Create the first administrator with `php bin/create-admin.php admin@example.com`; enter the password at the hidden prompt.
 - [ ] Confirm the application is served only over HTTPS and that the production session cookie is Secure/HttpOnly.
 
 ## 3. Provider and mailbox verification
