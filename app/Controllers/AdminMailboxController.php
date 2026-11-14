@@ -7,9 +7,11 @@ use App\Core\View;
 use App\Repositories\UserRepository;
 use App\Repositories\MailboxRepository;
 use App\Services\MailboxService;
+use App\Services\MailboxCredentialService;
+use App\Services\MailTransportFactory;
 final class AdminMailboxController
 {
-    public function __construct(private Auth $auth,private UserRepository $users,private MailboxRepository $mailboxes,private MailboxService $service,private View $view,private string $providerName,private string $mailDomain){}
+    public function __construct(private Auth $auth,private UserRepository $users,private MailboxRepository $mailboxes,private MailboxService $service,private View $view,private string $providerName,private string $mailDomain,private MailboxCredentialService $credentials,private MailTransportFactory $transports){}
     public function index():void
     {
         $admin=$this->auth->requireAdmin();
@@ -42,6 +44,25 @@ final class AdminMailboxController
         if($this->providerName==='manual'&&($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Confirm external suspension first.');}
         $this->service->suspend($id);header('Location: /admin/mailboxes');exit;
     }
+    public function testConnection(int $id):void
+    {
+        $this->auth->requireAdmin();Csrf::verify();
+        try{
+            $credentials=$this->credentials->forAdmin($id);
+            $imap=$this->transports->imap($credentials);
+            try{
+                $folders=$imap->folders();
+                if(!array_filter($folders,static fn(array $folder):bool=>$folder['role']==='inbox'))throw new \RuntimeException('IMAP INBOX folder was not found.');
+            }finally{$imap->close();}
+            $this->transports->smtp($credentials)->verify();
+            $_SESSION['mailbox_notice']='Connection test passed: IMAP folder discovery and SMTP TLS/authentication succeeded.';
+        }catch(\Throwable $e){
+            error_log('Mailbox connection test failed: '.get_class($e));
+            $_SESSION['mailbox_notice']='Connection test failed. Check the provider host, port, TLS mode, mailbox credentials and server logs.';
+        }
+        header('Location: /admin/mailboxes');exit;
+    }
+
     public function updateCredentials(int $id):void
     {
         $this->auth->requireAdmin();Csrf::verify();
