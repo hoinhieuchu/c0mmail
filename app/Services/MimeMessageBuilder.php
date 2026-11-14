@@ -5,12 +5,12 @@ final class MimeMessageBuilder
 {
  public function build(array $m,bool $allowEmptyTo=false):string
  {
-  $from=$this->address((string)($m['from']??''));$to=$this->addresses($m['to']??'');$cc=$this->addresses($m['cc']??'');
+  $from=$this->address((string)($m['from']??''));$to=$this->addresses($m['to']??'');$cc=$this->addresses($m['cc']??'');$bcc=$this->addresses($m['bcc']??'');\n  if(count($to)+count($cc)+count($bcc)>50)throw new \\InvalidArgumentException('A maximum of 50 recipients is allowed per message.');
   if(!$to&&!$allowEmptyTo)throw new \InvalidArgumentException('At least one To recipient is required.');
   $boundary='=_c0m_'.bin2hex(random_bytes(18));$headers=['Date: '.date(DATE_RFC2822),$this->foldAddresses('From',[$from])];
   if($to)$headers[]=$this->foldAddresses('To',$to);
   if($cc)$headers[]=$this->foldAddresses('Cc',$cc);
-  if($allowEmptyTo&&trim((string)($m['bcc']??''))!=='')$headers[]=$this->foldAddresses('X-C0m-Draft-Bcc',$this->addresses($m['bcc']));
+  if($allowEmptyTo&&trim((string)($m['bcc']??''))!=='')$headers[]=$this->foldAddresses('X-C0m-Draft-Bcc',$bcc);
   $domain=substr(strrchr((string)$m['from'],'@')?:'@localhost',1);
   $headers[]='Subject: '.$this->encodedSubject((string)($m['subject']??''));
   $headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.$domain.'>';
