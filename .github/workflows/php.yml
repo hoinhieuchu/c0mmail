@@ -45,7 +45,8 @@ jobs:
       - name: PHP syntax check
         run: find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Initialize MariaDB schema
-        run: mysql --host=127.0.0.1 --user=c0m --password=secret c0mmail < database/migrations/001_initial_schema.sql
+        run: |
+          mysql --host=127.0.0.1 --user=c0m --password=secret c0mmail < database/migrations/001_initial_schema.sql
           mysql --host=127.0.0.1 --user=c0m --password=secret c0mmail < database/migrations/002_login_rate_limits.sql
       - name: MySQL persistence and credential integration tests
         env:
