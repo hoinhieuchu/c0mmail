@@ -5,7 +5,7 @@ use App\Contracts\SmtpClientInterface;
 use App\Services\MimeMessageBuilder;
 final class SocketSmtpClient implements SmtpClientInterface
 {
- public function __construct(private string $host,private int $port,private string $encryption,private string $username,private string $password,private int $timeout=20,private ?MimeMessageBuilder $mime=null,private bool $allowInsecureAuth=false){}
+ public function __construct(private string $host,private int $port,private string $encryption,private string $username,private string $password,private int $timeout=20,private ?MimeMessageBuilder $mime=null,private bool $allowInsecureAuth=false){if($port<1||$port>65535)throw new \\InvalidArgumentException('Invalid SMTP port.');if($timeout<1||$timeout>120)throw new \\InvalidArgumentException('Invalid SMTP timeout.');}
  public function send(array $message):void
  {
   if(preg_match('/[\r\n]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
