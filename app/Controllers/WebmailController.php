@@ -39,7 +39,7 @@ final class WebmailController
   if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
   $draftUid=(int)($_POST['draft_uid']??0);$draftFolder=(string)($_POST['folder']??'Drafts');
   if(($_POST['mode']??'send')==='draft'){if($draftUid>0)$this->webmail->replaceDraft($creds,$draftFolder,$draftUid,$message);else $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;}
-  if($draftUid>0)$sentCopySaved=$this->webmail->sendDraft($creds,$draftFolder,$draftUid,$message);else $sentCopySaved=$this->webmail->send($creds,$message);header('Location: /mail/'.$id.'?sent=1&sent_copy='.($sentCopySaved?'1':'0'));exit;
+  if($draftUid>0)$sendResult=$this->webmail->sendDraft($creds,$draftFolder,$draftUid,$message);else $sendResult=['sent_copy_saved'=>$this->webmail->send($creds,$message),'draft_removed'=>true];header('Location: /mail/'.$id.'?sent=1&sent_copy='.($sendResult['sent_copy_saved']?'1':'0').'&draft_removed='.($sendResult['draft_removed']?'1':'0'));exit;
  }
  public function saveDraft(int $id):void
  {
