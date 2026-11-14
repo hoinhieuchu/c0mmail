@@ -25,7 +25,7 @@ PHP 8.1+ with PDO MySQL, OpenSSL, IMAP extension, fileinfo and sessions. MariaDB
 3. Import migrations in order: `database/migrations/001_initial_schema.sql`, then `database/migrations/002_login_rate_limits.sql`.
 4. Point the domain document root to `public/`; follow [cPanel installation](docs/installation-cpanel.md).
 5. Run the deployment preflight: `php bin/check-requirements.php`. Resolve every `[FAIL]` before opening the app to users. The script checks PHP extensions, APP_KEY, HTTPS and mail/database configuration; it does not test network connectivity.
-6. Create an administrator using `php bin/create-admin.php admin@example.com 'A-strong-password-14'`.
+6. Create an administrator using `php bin/create-admin.php admin@example.com`; enter the password at the hidden prompt.
 7. Follow the [production go-live checklist](docs/production-go-live.md) before enabling users.
 
 ## Mail transport configuration
