@@ -45,4 +45,4 @@ This application is a webmail client. The mail provider remains responsible for 
 
 ## Scope and verification limits
 
-CI uses MariaDB and GreenMail to verify SQL persistence and real IMAP/SMTP protocol behavior. It does not prove compatibility with a particular CraneMail production account, the target cPanel host, DNS records or the provider's mailbox provisioning API. The CraneMail HTTP provisioning adapter remains provisional until its official API contract and credentials are available.
+CI uses MariaDB and GreenMail to verify SQL persistence and real IMAP/SMTP protocol behavior. It does not prove compatibility with a particular CraneMail production account, the target cPanel host, DNS records or the provider's mailbox provisioning API. No CraneMail provisioning API is implemented. Manual provisioning is required until its official API contract and credentials are available and a verified adapter is delivered.
