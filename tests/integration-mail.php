@@ -17,7 +17,7 @@ try{
  foreach(['Milestone2Integration','Sent','Sent Items','Drafts'] as $folder){if(!array_filter($folders,fn($f)=>$f['path']===$folder))$imap->createFolder($folder);}
  $tmp=tempnam(sys_get_temp_dir(),'c0m-');file_put_contents($tmp,"real attachment test\n");
  $message=['from'=>$email,'to'=>$email,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server. Nội dung tiếng Việt để kiểm thử.','attachments'=>[['name'=>'probe.txt','path'=>$tmp,'type'=>'text/plain']]];
- $webmail->send(['email'=>$email,'password'=>$pass],$message);
+ check($webmail->send(['email'=>$email,'password'=>$pass],$message),'SMTP accepted the message and the Sent copy was appended');
  $listing=null;for($i=0;$i<20;$i++){usleep(250000);$listing=$imap->messages('INBOX',1,25);if($listing['total']>0)break;}
  check($listing!==null&&$listing['total']>0,'SMTP message delivered into the real IMAP inbox');
  check($imap->messages('Sent Items',1,25)['total']>0,'Configured custom Sent folder receives the sent copy');
