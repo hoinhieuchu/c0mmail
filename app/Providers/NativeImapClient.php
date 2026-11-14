@@ -63,7 +63,7 @@ final class NativeImapClient implements ImapClientInterface
  private function role(string $f):string
  {
   foreach($this->folderRoles as $role=>$path){$path=trim((string)$path);if($path!==''&&strcasecmp($f,$path)===0)return (string)$role;}
-  $segments=preg_split('/[\\\\/.>]+/',strtolower(trim($f)))?:[];$leaf=trim((string)end($segments));$leaf=preg_replace('/[_-]+/',' ',$leaf)??$leaf;
+  $segments=preg_split('~[\\\\/.>]+~',strtolower(trim($f)))?:[];$leaf=trim((string)end($segments));$leaf=preg_replace('/[_-]+/',' ',$leaf)??$leaf;
   return match($leaf){
    'inbox'=>'inbox',
    'sent','sent items','sent mail','sent messages'=>'sent',
