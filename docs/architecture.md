@@ -24,7 +24,9 @@ The IMAP adapter lists real server folders, maps common folder names to Inbox/Se
 
 ## Message composition and attachments
 
-`MimeMessageBuilder` produces multipart MIME. To, CC and BCC are used as SMTP envelope recipients; BCC is deliberately omitted from message headers. Attachment uploads are capped by configuration, limited to five files, and executable/script/web-page extensions are rejected. Downloads are forced to `application/octet-stream` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+`MimeMessageBuilder` produces multipart MIME. To, CC and BCC are used as SMTP envelope recipients; BCC is omitted from sent-message headers. Saved drafts store BCC in a private `X-C0m-Draft-Bcc` header so the field survives reopening; that header is emitted only for drafts and never for sent messages. Drafts can be reopened, edited and sent; existing attachments are downloaded from IMAP and retained when the draft is replaced or sent. Attachment uploads are capped by configuration, limited to five files, and executable/script/web-page extensions are rejected. Downloads are forced to `application/octet-stream` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+
+HTML message bodies are processed through an allowlist sanitizer and displayed in a sandboxed iframe without scripts, event handlers, remote images or embedded frames. This is intentionally a constrained email preview, not a full fidelity browser renderer.
 
 ## Synchronization model
 
@@ -36,4 +38,4 @@ Manual provisioning remains the default. The existing CraneMail HTTP provisionin
 
 ## Production exclusions
 
-No MTA/IMAP server is run by this application. OIDC, password reset, billing, domain verification, HTML rendering/sanitization, inline CID images, OAuth2 mail authentication, provider-special-use folder discovery and push/IDLE sync are not part of this milestone.
+No MTA/IMAP server is run by this application. OIDC, self-service password reset, billing, domain verification, inline CID images, OAuth2 mail authentication, provider-special-use folder discovery and push/IDLE sync are not part of this milestone.
