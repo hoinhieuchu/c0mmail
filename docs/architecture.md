@@ -6,7 +6,7 @@
 - `app/Core`: configuration, PDO, router, authentication, CSRF and views.
 - `app/Controllers`: request validation, authorization and HTTP responses, including administrator member lifecycle management.
 - `app/Repositories`: parameterized MariaDB/MySQL persistence.
-- `app/Services`: mailbox credential decryption, transport factory, MIME builder and webmail orchestration.
+- `app/Services`: mailbox credential decryption, transport factory, MIME builder, webmail orchestration and privacy-preserving login throttling.
 - `app/Contracts`: identity, IMAP and SMTP interfaces.
 - `app/Providers`: local identity, manual/CraneMail provisioning, native PHP IMAP and socket SMTP.
 
