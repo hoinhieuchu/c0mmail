@@ -20,6 +20,9 @@ curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -D /tmp/c0mmail-login-
 grep -qi '^Location: /dashboard' /tmp/c0mmail-login-headers
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/dashboard -o /tmp/c0mmail-dashboard.html
 grep -q 'Your mailboxes' /tmp/c0mmail-dashboard.html
+grep -qi '^X-Content-Type-Options: nosniff' /tmp/c0mmail-login-headers
+grep -qi '^X-Frame-Options: DENY' /tmp/c0mmail-login-headers
+grep -qi '^Content-Security-Policy:' /tmp/c0mmail-login-headers
 grep -q 'ci-admin@example.test' /tmp/c0mmail-dashboard.html
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/account/password -o /tmp/c0mmail-password.html
 grep -q 'Change password' /tmp/c0mmail-password.html
