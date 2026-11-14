@@ -8,7 +8,7 @@ final class MimeMessageBuilder
   $from=$this->address((string)($m['from']??''));$to=$this->addresses($m['to']??'');$cc=$this->addresses($m['cc']??'');
   if(!$to&&!$allowEmptyTo)throw new \InvalidArgumentException('At least one To recipient is required.');
   $boundary='=_c0m_'.bin2hex(random_bytes(18));$headers=['Date: '.date(DATE_RFC2822),'From: '.$from];if($to)$headers[]='To: '.implode(', ',$to);
-  if($cc)$headers[]='Cc: '.implode(', ',$cc);
+  if($cc)$headers[]='Cc: '.implode(', ',$cc);if($allowEmptyTo&&trim((string)($m['bcc']??''))!=='')$headers[]='X-C0m-Draft-Bcc: '.implode(', ',$this->addresses($m['bcc']));
   $domain=substr(strrchr((string)$m['from'],'@')?:'@localhost',1);$headers[]='Subject: =?UTF-8?B?'.base64_encode((string)($m['subject']??'')).'?=';$headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.$domain.'>';
   $headers[]='MIME-Version: 1.0';$headers[]='Content-Type: multipart/mixed; boundary="'.$boundary.'"';
   $body="--{$boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n".chunk_split(base64_encode((string)($m['body']??'')));
