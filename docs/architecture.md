@@ -8,7 +8,7 @@
 - `app/Repositories`: parameterized MariaDB/MySQL persistence.
 - `app/Services`: mailbox credential decryption, transport factory, MIME builder, webmail orchestration and privacy-preserving login throttling.
 - `app/Contracts`: identity, IMAP and SMTP interfaces.
-- `app/Providers`: local identity, manual/CraneMail provisioning, native PHP IMAP and socket SMTP.
+- `app/Providers`: local identity, manual provisioning, a disabled CraneMail boundary, native PHP IMAP and socket SMTP.
 
 ## Authentication abuse controls
 
@@ -38,7 +38,7 @@ The current milestone uses on-demand live IMAP reads and UID-based pagination/se
 
 ## CraneMail provisioning boundary
 
-Manual provisioning remains the default. The existing CraneMail HTTP provisioning adapter has configurable endpoints but is provisional and must be checked against official CraneMail API documentation before enabling. Message send/read operations do not call or infer any CraneMail-specific HTTP API; they use the standard protocols above.
+Manual provisioning remains the default. `CraneMailProvider` is a disabled boundary: it makes no HTTP requests and rejects provisioning, suspension and deletion until the official CraneMail API contract and credentials are supplied and the adapter is implemented and tested. Message send/read operations do not call or infer any CraneMail-specific HTTP API; they use the standard protocols above.
 
 ## Production exclusions
 
