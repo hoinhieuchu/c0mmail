@@ -14,7 +14,7 @@ final class LoginRateLimiter
         $raw=$config->required('APP_KEY');
         $key=str_starts_with($raw,'base64:')?base64_decode(substr($raw,7),true):false;
         if(!is_string($key)||strlen($key)!==32)throw new \RuntimeException('Invalid application encryption key.');
-        $this->key=$key;
+        $this->key=hash_hmac('sha256','c0mmail/login-rate-limit/v1',$key,true);
     }
 
     public function isBlocked(string $email,string $ip):bool
