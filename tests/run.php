@@ -27,7 +27,7 @@ test('HTML email sanitizer removes active content and unsafe attributes',functio
 });
 test('MIME builder folds long UTF-8 subjects and limits recipients',function(){
  $b=new MimeMessageBuilder();
- $raw=$b->build(['from'=>'sender@example.test','to'=>'one@example.test','subject'=>str_repeat('Tiếng Việt ',20),'body'=>'body']);
+ $raw=$b->build(['from'=>'C0m Mail <sender@example.test>','to'=>'one@example.test','subject'=>str_repeat('Tiếng Việt ',20),'body'=>'body']);
  $headers=explode("\r\n\r\n",$raw,2)[0];
  same(true,str_contains($headers,'=?UTF-8?B?'));
  same(false,(bool)preg_match('/^Bcc:/mi',$headers));\n same(true,(bool)preg_match('/^Message-ID: <[a-f0-9]+@example\\.test>$/mi',$headers));
