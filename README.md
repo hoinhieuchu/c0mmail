@@ -30,7 +30,7 @@ PHP 8.1+ with PDO MySQL, OpenSSL, IMAP extension, fileinfo and sessions. MariaDB
 
 - `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT`, `MAIL_IMAP_ENCRYPTION`: encryption is `ssl`, `starttls`, or `none`; certificate verification is enabled for TLS.
 - `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_ENCRYPTION`: encryption is `ssl`, `starttls`, or `none`. Auth uses the mailbox email and password.
-- `MAIL_PAGE_SIZE`: messages per page (maximum 50).
+- `MAIL_FOLDER_INBOX`, `MAIL_FOLDER_SENT`, `MAIL_FOLDER_DRAFTS`, `MAIL_FOLDER_SPAM`, `MAIL_FOLDER_TRASH`: optional exact IMAP folder paths for providers using localized or custom names. Leave Sent/Drafts/Spam/Trash blank to use common-name detection. Set these to the exact server paths (including hierarchy separators) reported by IMAP.\n- `MAIL_PAGE_SIZE`: messages per page (maximum 50).
 - `MAIL_ATTACHMENT_MAX_BYTES`, `MAIL_ATTACHMENT_TOTAL_MAX_BYTES`: per-file and per-message upload limits.
 
 The app expects the provider to expose standard IMAP and SMTP services. No CraneMail HTTP API is guessed for message operations. The old provisioning HTTP adapter remains disabled unless explicitly configured and verified against official CraneMail documentation.
