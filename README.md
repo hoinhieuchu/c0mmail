@@ -39,6 +39,7 @@ The app expects the provider to expose standard IMAP and SMTP services. No Crane
 
 - Unit: `php tests/run.php`
 - Database integration: import the migration into MariaDB/MySQL and run `php tests/integration-db.php` with `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` set.
+- HTTP smoke: configure a temporary `.env` and run `bash tests/http-smoke.sh` to exercise login, session protection, dashboard, account and admin routes.
 - Mail integration: start GreenMail with SMTP 3025, IMAP 3143, user `test@example.com` / `secret`, then run `php tests/integration-mail.php`.
 - CI starts GreenMail and MariaDB, then runs PHP lint, unit tests, database persistence/credential checks, and real IMAP/SMTP integration tests.
 
