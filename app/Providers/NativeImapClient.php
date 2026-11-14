@@ -60,7 +60,19 @@ final class NativeImapClient implements ImapClientInterface
  private function select(string $folder):void{if(!$this->validFolder($folder)||!imap_reopen($this->stream,$this->mailbox($folder)))throw new \RuntimeException('Unable to open IMAP folder.');}
  private function mailbox(string $folder):string{return $this->base.imap_utf7_encode($folder);}
  private function validFolder(string $f):bool{return $f!==''&&!preg_match('/[{}\x00-\x1F\x7F]/',$f);}
- private function role(string $f):string{foreach($this->folderRoles as $role=>$path){$path=trim((string)$path);if($path!==''&&strcasecmp($f,$path)===0)return (string)$role;}$v=strtolower($f);return match(true){$v==='inbox'=>'inbox',str_contains($v,'sent')=>'sent',str_contains($v,'draft')=>'drafts',str_contains($v,'spam')||str_contains($v,'junk')=>'spam',str_contains($v,'trash')||str_contains($v,'deleted')=>'trash',default=>'custom'};}
+ private function role(string $f):string
+ {
+  foreach($this->folderRoles as $role=>$path){$path=trim((string)$path);if($path!==''&&strcasecmp($f,$path)===0)return (string)$role;}
+  $segments=preg_split('/[\\\\/.>]+/',strtolower(trim($f)))?:[];$leaf=trim((string)end($segments));$leaf=preg_replace('/[_-]+/',' ',$leaf)??$leaf;
+  return match($leaf){
+   'inbox'=>'inbox',
+   'sent','sent items','sent mail','sent messages'=>'sent',
+   'draft','drafts'=>'drafts',
+   'spam','junk','junk email','junk e-mail','bulk mail'=>'spam',
+   'trash','deleted','deleted items','deleted messages'=>'trash',
+   default=>'custom'
+  };
+ }
  private function decode(string $v):string
  {
   $parts=imap_mime_header_decode($v);if(!$parts)return $v;$out='';
