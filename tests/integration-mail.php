@@ -23,7 +23,8 @@ try{
  check($imap->messages('Sent Items',1,25)['total']>0,'Configured custom Sent folder receives the sent copy');
  $uid=(int)$listing['messages'][0]['uid'];$read=$imap->message('INBOX',$uid);
  check(str_contains($read['subject'],'c0m.me Mail integration'),'IMAP fetched message headers and body');
- $search=$imap->messages('INBOX',1,25,'c0m.me Mail integration');check($search['total']>0,'IMAP server-side text search returns matching messages');\n $unicodeSearch=$imap->messages('INBOX',1,25,'tiếng Việt');check($unicodeSearch['total']>0,'IMAP UTF-8 search returns Vietnamese text matches');
+ $search=$imap->messages('INBOX',1,25,'c0m.me Mail integration');check($search['total']>0,'IMAP server-side text search returns matching messages');
+ $unicodeSearch=$imap->messages('INBOX',1,25,'tiếng Việt');check($unicodeSearch['total']>0,'IMAP UTF-8 search returns Vietnamese text matches');
  $imap->setFlag('INBOX',$uid,'seen',false);$unread=$imap->messages('INBOX',1,25);$unreadRow=array_values(array_filter($unread['messages'],fn($m)=>$m['uid']===$uid))[0]??null;check($unreadRow!==null&&!$unreadRow['seen'],'IMAP unread flag is reflected in message listing');
  $imap->setFlag('INBOX',$uid,'seen',true);$imap->setFlag('INBOX',$uid,'flagged',true);$flagged=$imap->messages('INBOX',1,25);$flaggedRow=array_values(array_filter($flagged['messages'],fn($m)=>$m['uid']===$uid))[0]??null;check($flaggedRow!==null&&$flaggedRow['flagged'],'IMAP star flag is reflected in message listing');
  check(count($read['attachments'])===1,'MIME attachment metadata parsed');
