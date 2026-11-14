@@ -24,11 +24,11 @@ test('HTML email sanitizer removes active content and unsafe attributes',functio
  same(true,str_contains($clean,'Safe content'));
  same(true,str_contains($clean,'Nested safe text'));
 });
-test('environment example exposes separate valid IMAP and SMTP settings',function(){
+test('SMTP refuses plaintext authentication unless explicitly allowed',function(){\n $client=new SocketSmtpClient('127.0.0.1',25,'none','user@example.test','secret',1,null,false);\n try{$client->send(['from'=>'user@example.test','to'=>'recipient@example.test','subject'=>'test','body'=>'test']);throw new RuntimeException('Expected plaintext-authentication refusal');}\n catch(RuntimeException $e){same(true,str_contains($e->getMessage(),'unencrypted connection'));}\n});\ntest('environment example exposes separate valid IMAP and SMTP settings',function(){
  $config=Config::load(dirname(__DIR__).'/.env.example');
  same('ssl',$config->get('MAIL_IMAP_ENCRYPTION'));
  same('starttls',$config->get('MAIL_SMTP_ENCRYPTION'));
- same('20',$config->get('MAIL_SMTP_TIMEOUT'));
+ same('20',$config->get('MAIL_SMTP_TIMEOUT'));\n same('false',$config->get('MAIL_ALLOW_INSECURE_AUTH'));
  same('25',$config->get('MAIL_PAGE_SIZE'));
  same('INBOX',$config->get('MAIL_FOLDER_INBOX'));
 });
