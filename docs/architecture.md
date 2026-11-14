@@ -18,7 +18,7 @@ Controllers use `MemberProviderInterface`. The current local session provider is
 
 CraneMail is an external mailbox host, not a webmail UI dependency. `ImapClientInterface` and `SmtpClientInterface` isolate the engine from any specific mail host. `NativeImapClient` uses PHP's IMAP extension with TLS certificate verification. `SocketSmtpClient` implements SMTP greeting/EHLO, optional STARTTLS or implicit TLS, AUTH LOGIN, envelope recipients, DATA, MIME transfer and dot-stuffing.
 
-The configured mailbox email/password authenticate to both protocols. The password is AES-256-GCM encrypted in the mailboxes table and decrypted only in request memory. It is not stored in a PHP session, rendered in HTML, or written to application logs. SMTP AUTH commands and IMAP credentials are not logged.
+The configured mailbox email/password authenticate to both protocols. The password is AES-256-GCM encrypted in the mailboxes table and decrypted only in request memory. It is not stored in a PHP session or written to application logs. During manual provisioning, the initial password is shown only in the immediate no-store admin response, not in a session flash. SMTP AUTH commands and IMAP credentials are not logged.
 
 The IMAP adapter lists real server folders, maps common folder names to Inbox/Sent/Drafts/Spam/Trash roles, paginates by UID, searches message text, fetches MIME content and attachments, updates Seen/Flagged flags, moves/deletes messages, creates custom folders and APPENDs drafts/Sent copies. Folder role matching is name-based at present; providers with non-English or unusual names may need explicit folder mapping.
 
