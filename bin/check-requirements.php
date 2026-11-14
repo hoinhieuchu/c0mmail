@@ -51,6 +51,8 @@ $imapTimeout=(int)$config->get('MAIL_IMAP_TIMEOUT','20');
 $report('MAIL_IMAP_TIMEOUT is between 1 and 120 seconds',$imapTimeout>=1&&$imapTimeout<=120);
 $smtpTimeout=(int)$config->get('MAIL_SMTP_TIMEOUT','20');
 $report('MAIL_SMTP_TIMEOUT is between 1 and 120 seconds',$smtpTimeout>=1&&$smtpTimeout<=120);
+$ipWideLimit=strtolower((string)$config->get('LOGIN_RATE_LIMIT_IP_WIDE','false'))==='true';
+$report('Global IP login throttling is disabled unless REMOTE_ADDR is the real client IP',!$ipWideLimit,'warning');
 $allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
 $report('Insecure SMTP authentication is disabled in production',!($appEnv==='production'&&$allowInsecure));
 
