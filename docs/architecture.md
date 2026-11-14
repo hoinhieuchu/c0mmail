@@ -26,7 +26,7 @@ The IMAP adapter lists real server folders, maps common folder names to Inbox/Se
 
 `MimeMessageBuilder` produces multipart MIME. To, CC and BCC are used as SMTP envelope recipients; BCC is omitted from sent-message headers. Saved drafts store BCC in a private `X-C0m-Draft-Bcc` header so the field survives reopening; that header is emitted only for drafts and never for sent messages. Drafts can be reopened, edited and sent; existing attachments are downloaded from IMAP and retained when the draft is replaced or sent. Attachment uploads are capped by configuration, limited to five files, and executable/script/web-page extensions are rejected. Downloads are forced to `application/octet-stream` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
 
-HTML message bodies are processed through an allowlist sanitizer and displayed in a sandboxed iframe without scripts, event handlers, remote images or embedded frames. This is intentionally a constrained email preview, not a full fidelity browser renderer.
+HTML message bodies are processed through an allowlist sanitizer and displayed in a sandboxed iframe without scripts, event handlers, remote images or embedded frames. The front controller also emits a restrictive Content Security Policy, frame denial, MIME sniffing protection, a no-referrer policy and a restrictive Permissions Policy. This is intentionally a constrained email preview, not a full fidelity browser renderer.
 
 ## Synchronization model
 
