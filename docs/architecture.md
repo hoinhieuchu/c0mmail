@@ -34,7 +34,7 @@ HTML message bodies are processed through an allowlist sanitizer and displayed i
 
 ## Synchronization model
 
-The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged without secrets and shown to the user as a warning; the UI explicitly advises against resending a message already accepted by SMTP. Draft-send cleanup failures are also surfaced so users do not accidentally send duplicates.
+The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. Administrators can test an active mailbox's IMAP folder listing and SMTP TLS/AUTH handshake without sending mail. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged without secrets and shown to the user as a warning; the UI explicitly advises against resending a message already accepted by SMTP. Draft-send cleanup failures are also surfaced so users do not accidentally send duplicates.
 
 ## CraneMail provisioning boundary
 
