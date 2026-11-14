@@ -6,6 +6,7 @@ use App\Providers\NativeImapClient;
 use App\Services\MimeMessageBuilder;
 use App\Services\MailTransportFactory;
 use App\Services\MailboxWebmailService;
+use App\Providers\SocketSmtpClient;
 function check(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);echo "PASS {$message}\n";}
 $host=getenv('MAIL_TEST_HOST')?:'127.0.0.1';$imapPort=(int)(getenv('MAIL_TEST_IMAP_PORT')?:3143);$smtpPort=(int)(getenv('MAIL_TEST_SMTP_PORT')?:3025);$user=getenv('MAIL_TEST_USER')?:'test@example.com';$email=getenv('MAIL_TEST_EMAIL')?:'test@example.com';$pass=getenv('MAIL_TEST_PASSWORD')?:'secret';
 check(function_exists('imap_open'),'PHP IMAP extension loaded');
@@ -16,6 +17,7 @@ try{
  $folders=$imap->folders();check((bool)array_filter($folders,fn($f)=>strtoupper($f['path'])==='INBOX'),'IMAP INBOX exists');
  foreach(['Milestone2Integration','Sent','Sent Items','Drafts'] as $folder){if(!array_filter($folders,fn($f)=>$f['path']===$folder))$imap->createFolder($folder);}
  $tmp=tempnam(sys_get_temp_dir(),'c0m-');file_put_contents($tmp,"real attachment test\n");
+ $smtpVerifier=new SocketSmtpClient($host,$smtpPort,'none',$email,$pass,20,null,true);$smtpVerifier->verify();check(true,'SMTP AUTH LOGIN verified without sending a message');
  $message=['from'=>$email,'to'=>$email,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server. Nội dung tiếng Việt để kiểm thử.','attachments'=>[['name'=>'café probe.txt','path'=>$tmp,'type'=>'text/plain']]];
  check($webmail->send(['email'=>$email,'password'=>$pass],$message),'SMTP accepted the message and the Sent copy was appended');
  $listing=null;for($i=0;$i<20;$i++){usleep(250000);$listing=$imap->messages('INBOX',1,25);if($listing['total']>0)break;}
