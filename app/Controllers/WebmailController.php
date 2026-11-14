@@ -15,6 +15,7 @@ final class WebmailController
   $user=$this->auth->requireLogin();$creds=$this->credentials->forUser($id,(int)$user['id']);$folders=$this->webmail->folders($creds);
   $folder=(string)($_GET['folder']??$this->folderByRole($folders,'inbox')??'INBOX');$page=max(1,(int)($_GET['page']??1));$query=trim((string)($_GET['q']??''));$listing=$this->webmail->messages($creds,$folder,$page,$query?:null);
   $compose=$this->composeDefaults($creds,$folder);
+  if(isset($_GET['edit_draft'])){$draftUid=(int)$_GET['edit_draft'];$draft=$this->webmail->message($creds,$folder,$draftUid);$compose=['to'=>$draft['to'],'cc'=>$draft['cc'],'bcc'=>'','subject'=>$draft['subject'],'body'=>$draft['body'],'draft_uid'=>$draftUid,'attachments'=>$draft['attachments']];}
   if(isset($_GET['reply'])||isset($_GET['forward'])){$uid=(int)($_GET['reply']??$_GET['forward']);$original=$this->webmail->message($creds,$folder,$uid);if(isset($_GET['reply'])){$compose['to']=$original['from'];$compose['subject']='Re: '.$original['subject'];$compose['body']="\n\nOn ".$original['date'].", ".$original['from']." wrote:\n> ".str_replace("\n","\n> ",$original['body']);}else{$compose['subject']='Fwd: '.$original['subject'];$compose['body']="\n\n---------- Forwarded message ----------\nFrom: ".$original['from']."\nDate: ".$original['date']."\nSubject: ".$original['subject']."\n\n".$original['body'];}}
   $this->view->render('webmail',['title'=>$creds['email'],'user'=>$user,'mailbox'=>$creds,'folders'=>$folders,'folder'=>$folder,'listing'=>$listing,'message'=>null,'compose'=>$compose,'error'=>null]);
  }
@@ -36,8 +37,9 @@ final class WebmailController
   $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$attachments=$this->uploads();
   $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$attachments];
   if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
-  if(($_POST['mode']??'send')==='draft'){$this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;}
-  $this->webmail->send($creds,$message);header('Location: /mail/'.$id.'?sent=1');exit;
+  $draftUid=(int)($_POST['draft_uid']??0);$draftFolder=(string)($_POST['folder']??'Drafts');
+  if(($_POST['mode']??'send')==='draft'){if($draftUid>0)$this->webmail->replaceDraft($creds,$draftFolder,$draftUid,$message);else $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;}
+  if($draftUid>0)$this->webmail->sendDraft($creds,$draftFolder,$draftUid,$message);else $this->webmail->send($creds,$message);header('Location: /mail/'.$id.'?sent=1');exit;
  }
  public function saveDraft(int $id):void
  {
