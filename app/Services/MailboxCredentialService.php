@@ -8,14 +8,27 @@ final class MailboxCredentialService
  public function __construct(private MailboxRepository $mailboxes,private Config $config){}
  public function forUser(int $mailboxId,int $userId):array
  {
-  $m=$this->mailboxes->findForUser($mailboxId,$userId);
-  if(!$m||$m['status']!=='active')throw new \RuntimeException('Mailbox is unavailable.');
-  if(!$m['password_ciphertext']||!$m['password_nonce']||!$m['password_tag'])throw new \RuntimeException('Mailbox credentials are not configured.');
+  $mailbox=$this->mailboxes->findForUser($mailboxId,$userId);
+  if(!$mailbox||$mailbox['status']!=='active')throw new \RuntimeException('Mailbox is unavailable.');
+  return $this->decrypt($mailbox);
+ }
+ public function forAdmin(int $mailboxId):array
+ {
+  $mailbox=$this->mailboxes->find($mailboxId);
+  if(!$mailbox||$mailbox['status']!=='active')throw new \RuntimeException('Mailbox is unavailable.');
+  return $this->decrypt($mailbox);
+ }
+ private function decrypt(array $mailbox):array
+ {
+  if(!$mailbox['password_ciphertext']||!$mailbox['password_nonce']||!$mailbox['password_tag'])throw new \RuntimeException('Mailbox credentials are not configured.');
   $raw=$this->config->required('APP_KEY');$key=str_starts_with($raw,'base64:')?base64_decode(substr($raw,7),true):false;
   if($key===false||strlen($key)!==32)throw new \RuntimeException('Invalid application encryption key.');
-  $cipher=base64_decode($m['password_ciphertext'],true);
-  $password=openssl_decrypt($cipher,'aes-256-gcm',$key,OPENSSL_RAW_DATA,hex2bin($m['password_nonce']),hex2bin($m['password_tag']));
+  $cipher=base64_decode($mailbox['password_ciphertext'],true);
+  if($cipher===false)throw new \RuntimeException('Mailbox credential decryption failed.');
+  $nonce=hex2bin($mailbox['password_nonce']);$tag=hex2bin($mailbox['password_tag']);
+  if($nonce===false||$tag===false)throw new \RuntimeException('Mailbox credential decryption failed.');
+  $password=openssl_decrypt($cipher,'aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);
   if($password===false)throw new \RuntimeException('Mailbox credential decryption failed.');
-  return ['id'=>(int)$m['id'],'email'=>$m['email'],'display_name'=>$m['display_name'],'password'=>$password];
+  return ['id'=>(int)$mailbox['id'],'email'=>$mailbox['email'],'display_name'=>$mailbox['display_name'],'password'=>$password];
  }
 }
