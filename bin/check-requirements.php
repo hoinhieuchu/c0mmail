@@ -11,12 +11,9 @@ $errors=0;
 $warnings=0;
 
 $report=static function(string $label,bool $ok,string $severity='error')use(&$errors,&$warnings):void{
-    if($ok){echo "[PASS] {$label}
-";return;}
-    if($severity==='warning'){$warnings++;echo "[WARN] {$label}
-";return;}
-    $errors++;echo "[FAIL] {$label}
-";
+    if($ok){echo "[PASS] {$label}\n";return;}
+    if($severity==='warning'){$warnings++;echo "[WARN] {$label}\n";return;}
+    $errors++;echo "[FAIL] {$label}\n";
 };
 
 $report('PHP 8.1 or newer',PHP_VERSION_ID>=80100);
@@ -55,9 +52,6 @@ $report('MAIL_IMAP_TIMEOUT is between 1 and 120 seconds',$imapTimeout>=1&&$imapT
 $allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
 $report('Insecure SMTP authentication is disabled in production',!($appEnv==='production'&&$allowInsecure));
 
-echo "
-";
-echo $errors===0?"Preflight passed with {$warnings} warning(s). No network connectivity test was performed.
-":"Preflight failed: {$errors} error(s), {$warnings} warning(s). No network connectivity test was performed.
-";
+echo "\n";
+echo $errors===0?"Preflight passed with {$warnings} warning(s). No network connectivity test was performed.\n":"Preflight failed: {$errors} error(s), {$warnings} warning(s). No network connectivity test was performed.\n";
 exit($errors===0?0:1);
