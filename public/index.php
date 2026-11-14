@@ -31,6 +31,9 @@ header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:");
 header_remove('X-Powered-By');
 $config=Config::load(dirname(__DIR__).'/.env');
+$debug=strtolower((string)$config->get('APP_DEBUG','false'))==='true';
+if(!$debug)ini_set('display_errors','0');
+set_exception_handler(static function(\\Throwable $exception)use($debug):void{error_log('Unhandled application exception: '.get_class($exception));if(!headers_sent()){http_response_code(500);header('Content-Type: text/plain; charset=UTF-8');}echo $debug?htmlspecialchars((string)$exception,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'):'An unexpected error occurred. Please try again.';});
 $isProduction=strtolower((string)$config->get('APP_ENV','production'))==='production';
 if($isProduction)header('Strict-Transport-Security: max-age=31536000');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$isProduction,'samesite'=>'Lax']);session_start();}
