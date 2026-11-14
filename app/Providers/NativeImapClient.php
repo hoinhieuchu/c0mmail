@@ -25,7 +25,7 @@ final class NativeImapClient implements ImapClientInterface
  public function messages(string $folder,int $page,int $perPage,?string $query=null):array
  {
   $this->select($folder);$criteria='ALL';
-  if($query!==null&&trim($query)!==''){$q=trim($query);if(strlen($q)>200)throw new \InvalidArgumentException('Search query is too long.');$criteria='TEXT "'.addcslashes($q,'\\\"').'"';}
+  if($query!==null&&trim($query)!==''){$q=trim($query);if(strlen($q)>200)throw new \InvalidArgumentException('Search query is too long.');if(preg_match('/[\x00-\x1F\x7F]/',$q))throw new \InvalidArgumentException('Search query contains unsupported control characters.');$criteria='TEXT "'.addcslashes($q,'\\\"').'"';}
   $uids=imap_search($this->stream,$criteria,SE_UID)?:[];rsort($uids,SORT_NUMERIC);$total=count($uids);$slice=array_slice($uids,max(0,($page-1)*$perPage),$perPage);$rows=[];
   foreach($slice as $uid){$o=imap_fetch_overview($this->stream,(string)$uid,FT_UID);if(!$o||!isset($o[0]))continue;$v=$o[0];$rows[]=['uid'=>(int)$uid,'subject'=>$this->decode((string)($v->subject??'')),'from'=>$this->decode((string)($v->from??'')),'date'=>(string)($v->date??''),'seen'=>(bool)($v->seen??false),'flagged'=>(bool)($v->flagged??false),'size'=>(int)($v->size??0)];}
   return ['messages'=>$rows,'total'=>$total,'page'=>$page,'per_page'=>$perPage,'pages'=>(int)ceil($total/max(1,$perPage))];
@@ -54,7 +54,7 @@ final class NativeImapClient implements ImapClientInterface
  public function close():void{if($this->stream){imap_close($this->stream);$this->stream=null;}}
  private function select(string $folder):void{if(!$this->validFolder($folder)||!imap_reopen($this->stream,$this->mailbox($folder)))throw new \RuntimeException('Unable to open IMAP folder.');}
  private function mailbox(string $folder):string{return $this->base.imap_utf7_encode($folder);}
- private function validFolder(string $f):bool{return $f!==''&&!preg_match('/[{}\r\n]/',$f);}
+ private function validFolder(string $f):bool{return $f!==''&&!preg_match('/[{}\x00-\x1F\x7F]/',$f);}
  private function role(string $f):string{$v=strtolower($f);return match(true){$v==='inbox'=>'inbox',str_contains($v,'sent')=>'sent',str_contains($v,'draft')=>'drafts',str_contains($v,'spam')||str_contains($v,'junk')=>'spam',str_contains($v,'trash')||str_contains($v,'deleted')=>'trash',default=>'custom'};}
  private function decode(string $v):string{$parts=imap_mime_header_decode($v);return implode('',array_map(fn($p)=>$p->text,$parts?:[]));}
  private function walk(int $uid,object $s,string $prefix,string &$plain,string &$html,array &$atts):void
