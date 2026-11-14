@@ -10,6 +10,10 @@
 - `app/Contracts`: identity, IMAP and SMTP interfaces.
 - `app/Providers`: local identity, manual/CraneMail provisioning, native PHP IMAP and socket SMTP.
 
+## Authentication abuse controls
+
+Failed login attempts are stored as HMAC-SHA256 hashes of normalized email and remote IP, keyed by `APP_KEY`; raw identifiers are not persisted. The throttle blocks after 10 failures for an email/IP pair, 30 failures for one email across IPs, or 60 failures for one IP, all within a rolling 15-minute window. A successful login clears that email's prior failures. Old rows are pruned opportunistically after 30 days. Apply migration `002_login_rate_limits.sql` after the initial schema.
+
 ## Identity provider boundary
 
 Controllers use `MemberProviderInterface`. The current local session provider is used for development. A future OIDC provider must validate issuer, audience, signature, state, nonce and PKCE, then map the verified subject to a local member. No Account Center endpoint or SSO assumption is embedded.
