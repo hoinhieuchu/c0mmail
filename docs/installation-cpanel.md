@@ -13,7 +13,7 @@
 
 ## Mail protocol values
 
-Use the exact server names and ports given by the mailbox host. Typical secure defaults are IMAP SSL/TLS port 993 and SMTP STARTTLS port 587, but do not assume these are correct for every provider. `MAIL_IMAP_ENCRYPTION` and `MAIL_SMTP_ENCRYPTION` accept `ssl`, `starttls`, or `none`; TLS peer and hostname verification is enabled.
+Use the exact server names and ports given by the mailbox host. Typical secure defaults are IMAP SSL/TLS port 993 and SMTP STARTTLS port 587, but do not assume these are correct for every provider. `MAIL_IMAP_TIMEOUT` bounds IMAP open/read/write operations (1–120 seconds). `MAIL_IMAP_ENCRYPTION` and `MAIL_SMTP_ENCRYPTION` accept `ssl`, `starttls`, or `none`; TLS peer and hostname verification is enabled.
 
 The app authenticates to IMAP/SMTP using each mailbox's address and password. It does not run a mail server and does not use a guessed CraneMail HTTP API for message access. Start with a mailbox that has real IMAP/SMTP credentials and verify send/receive before enabling users.
 
