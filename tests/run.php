@@ -34,6 +34,8 @@ test('MIME builder folds long UTF-8 subjects and limits recipients',function(){
  $recipients=array_fill(0,51,'user@example.test');
  try{$b->build(['from'=>'sender@example.test','to'=>$recipients,'subject'=>'test','body'=>'']);throw new RuntimeException('Expected recipient limit');}
  catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'50 recipients'));}
+ try{$b->build(['from'=>'sender@example.test','to'=>array_fill(0,30,'to@example.test'),'cc'=>array_fill(0,20,'cc@example.test'),'bcc'=>'bcc@example.test','subject'=>'test','body'=>'']);throw new RuntimeException('Expected combined recipient limit');}
+ catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'50 recipients'));}
 });
 test('SMTP refuses plaintext authentication unless explicitly allowed',function(){
  $client=new SocketSmtpClient('127.0.0.1',25,'none','user@example.test','secret',1,null,false);
