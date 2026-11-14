@@ -31,14 +31,18 @@ test('MIME builder folds long UTF-8 subjects and limits recipients',function(){
  $headers=explode("\r\n\r\n",$raw,2)[0];
  same(true,str_contains($headers,'=?UTF-8?B?'));
  same(false,(bool)preg_match('/^Bcc:/mi',$headers));
- foreach(explode("\r\n",$headers) as $line){if(str_starts_with($line,'Subject:')||str_starts_with($line,' '))same(true,strlen($line)<=78);}
- try{$b->build(['from'=>'sender@example.test','to'=>"victim@example.test\r\nBcc: attacker@example.test",'subject'=>'test','body'=>'']);throw new RuntimeException('Expected header injection refusal');}
- catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'Invalid email address'));}
- $recipients=array_fill(0,51,'user@example.test');
- try{$b->build(['from'=>'sender@example.test','to'=>$recipients,'subject'=>'test','body'=>'']);throw new RuntimeException('Expected recipient limit');}
- catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'50 recipients'));}
- try{$b->build(['from'=>'sender@example.test','to'=>array_fill(0,30,'to@example.test'),'cc'=>array_fill(0,20,'cc@example.test'),'bcc'=>'bcc@example.test','subject'=>'test','body'=>'']);throw new RuntimeException('Expected combined recipient limit');}
- catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'50 recipients'));}
+ foreach(explode("\r\n",$headers) as $line){
+  if(str_starts_with($line,'Subject:')||str_starts_with($line,' '))same(true,strlen($line)<=78);
+ }
+ $cases=[
+  [['from'=>'sender@example.test','to'=>"victim@example.test\r\nBcc: attacker@example.test",'subject'=>'test','body'=>''],'Invalid email address'],
+  [['from'=>'sender@example.test','to'=>array_fill(0,51,'user@example.test'),'subject'=>'test','body'=>''],'50 recipients'],
+  [['from'=>'sender@example.test','to'=>array_fill(0,30,'to@example.test'),'cc'=>array_fill(0,20,'cc@example.test'),'bcc'=>'bcc@example.test','subject'=>'test','body'=>''],'50 recipients'],
+ ];
+ foreach($cases as [$message,$expected]){
+  try{$b->build($message);throw new RuntimeException('Expected MIME validation refusal');}
+  catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),$expected));}
+ }
 });
 test('SMTP validates endpoint syntax and port bounds before connecting',function(){
  try{(new SocketSmtpClient("smtp.example.test\r\n",587,'ssl','','',1))->send(['from'=>'sender@example.test','to'=>'to@example.test','subject'=>'test','body'=>'']);throw new RuntimeException('Expected invalid host refusal');}
