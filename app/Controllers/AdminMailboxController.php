@@ -46,19 +46,21 @@ final class AdminMailboxController
     }
     public function testConnection(int $id):void
     {
-        $this->auth->requireAdmin();Csrf::verify();
+        $this->auth->requireAdmin();Csrf::verify();$stage='credential decryption';
         try{
             $credentials=$this->credentials->forAdmin($id);
+            $stage='IMAP';
             $imap=$this->transports->imap($credentials);
             try{
                 $folders=$imap->folders();
                 if(!array_filter($folders,static fn(array $folder):bool=>$folder['role']==='inbox'))throw new \RuntimeException('IMAP INBOX folder was not found.');
             }finally{$imap->close();}
+            $stage='SMTP';
             $this->transports->smtp($credentials)->verify();
-            $_SESSION['mailbox_notice']='Connection test passed: IMAP folder discovery and SMTP TLS/authentication succeeded.';
+            $_SESSION['mailbox_notice']='Connection test passed: IMAP folder discovery and SMTP TLS/AUTH succeeded without sending a message.';
         }catch(\Throwable $e){
-            error_log('Mailbox connection test failed: '.get_class($e));
-            $_SESSION['mailbox_notice']='Connection test failed. Check the provider host, port, TLS mode, mailbox credentials and server logs.';
+            error_log('Mailbox '.$stage.' connection test failed: '.get_class($e));
+            $_SESSION['mailbox_notice']=$stage.' connection test failed. Check the provider host, port, TLS mode, mailbox credentials and server logs.';
         }
         header('Location: /admin/mailboxes');exit;
     }
