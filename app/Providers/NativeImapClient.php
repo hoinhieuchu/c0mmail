@@ -27,7 +27,7 @@ final class NativeImapClient implements ImapClientInterface
  {
   $this->select($folder);$criteria='ALL';
   if($query!==null&&trim($query)!==''){$q=trim($query);if(strlen($q)>200)throw new \InvalidArgumentException('Search query is too long.');if(preg_match('/[\x00-\x1F\x7F]/',$q))throw new \InvalidArgumentException('Search query contains unsupported control characters.');$criteria='TEXT "'.addcslashes($q,'\\\"').'"';}
-  $uids=imap_search($this->stream,$criteria,SE_UID)?:[];rsort($uids,SORT_NUMERIC);$total=count($uids);$slice=array_slice($uids,max(0,($page-1)*$perPage),$perPage);$rows=[];
+  $uids=imap_search($this->stream,$criteria,SE_UID,'UTF-8')?:[];rsort($uids,SORT_NUMERIC);$total=count($uids);$slice=array_slice($uids,max(0,($page-1)*$perPage),$perPage);$rows=[];
   foreach($slice as $uid){$o=imap_fetch_overview($this->stream,(string)$uid,FT_UID);if(!$o||!isset($o[0]))continue;$v=$o[0];$rows[]=['uid'=>(int)$uid,'subject'=>$this->decode((string)($v->subject??'')),'from'=>$this->decode((string)($v->from??'')),'date'=>(string)($v->date??''),'seen'=>(bool)($v->seen??false),'flagged'=>(bool)($v->flagged??false),'size'=>(int)($v->size??0)];}
   return ['messages'=>$rows,'total'=>$total,'page'=>$page,'per_page'=>$perPage,'pages'=>(int)ceil($total/max(1,$perPage))];
  }
