@@ -54,6 +54,12 @@ jobs:
           DB_USERNAME: c0m
           DB_PASSWORD: secret
         run: php tests/integration-db.php
+      - name: Configure isolated HTTP smoke environment
+        run: |
+          printf '%s\n' 'APP_ENV=testing' 'APP_SESSION_NAME=c0mmail_ci' 'DB_HOST=127.0.0.1' 'DB_PORT=3306' 'DB_DATABASE=c0mmail' 'DB_USERNAME=c0m' 'DB_PASSWORD=secret' 'MAIL_DOMAIN=example.test' 'MAIL_PROVIDER=manual' 'MAIL_SMTP_HOST=127.0.0.1' 'MAIL_SMTP_PORT=3025' 'MAIL_SMTP_ENCRYPTION=none' 'MAIL_IMAP_HOST=127.0.0.1' 'MAIL_IMAP_PORT=3143' 'MAIL_IMAP_ENCRYPTION=none' > .env
+          printf 'APP_KEY=base64:%s\n' "$(php -r 'echo base64_encode(random_bytes(32));')" >> .env
+      - name: HTTP login, session and admin smoke tests
+        run: bash tests/http-smoke.sh
       - name: Unit tests
         run: php tests/run.php
       - name: Real IMAP and SMTP integration tests
