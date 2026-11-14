@@ -28,7 +28,7 @@ final class LoginRateLimiter
         $byEmail=$this->count('email_hash=?',[$emailHash]);
         if($byEmail>=30)return true;
         $byIp=$this->count('ip_hash=?',[$ipHash]);
-        return $byIp>=120;
+        return $this->ipWideEnabled&&$byIp>=120;
     }
 
     public function recordFailure(string $email,string $ip):void
