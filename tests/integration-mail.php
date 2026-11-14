@@ -16,7 +16,7 @@ try{
  $folders=$imap->folders();check((bool)array_filter($folders,fn($f)=>strtoupper($f['path'])==='INBOX'),'IMAP INBOX exists');
  foreach(['Milestone2Integration','Sent','Sent Items','Drafts'] as $folder){if(!array_filter($folders,fn($f)=>$f['path']===$folder))$imap->createFolder($folder);}
  $tmp=tempnam(sys_get_temp_dir(),'c0m-');file_put_contents($tmp,"real attachment test\n");
- $message=['from'=>$email,'to'=>$email,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server. Nội dung tiếng Việt để kiểm thử.','attachments'=>[['name'=>'probe.txt','path'=>$tmp,'type'=>'text/plain']]];
+ $message=['from'=>$email,'to'=>$email,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server. Nội dung tiếng Việt để kiểm thử.','attachments'=>[['name'=>'café probe.txt','path'=>$tmp,'type'=>'text/plain']]];
  check($webmail->send(['email'=>$email,'password'=>$pass],$message),'SMTP accepted the message and the Sent copy was appended');
  $listing=null;for($i=0;$i<20;$i++){usleep(250000);$listing=$imap->messages('INBOX',1,25);if($listing['total']>0)break;}
  check($listing!==null&&$listing['total']>0,'SMTP message delivered into the real IMAP inbox');
@@ -28,7 +28,7 @@ try{
  $unicodeSearch=$imap->messages('INBOX',1,25,'tiếng Việt');check($unicodeSearch['total']>0,'IMAP UTF-8 search returns Vietnamese text matches');
  $imap->setFlag('INBOX',$uid,'seen',false);$unread=$imap->messages('INBOX',1,25);$unreadRow=array_values(array_filter($unread['messages'],fn($m)=>$m['uid']===$uid))[0]??null;check($unreadRow!==null&&!$unreadRow['seen'],'IMAP unread flag is reflected in message listing');
  $imap->setFlag('INBOX',$uid,'seen',true);$imap->setFlag('INBOX',$uid,'flagged',true);$flagged=$imap->messages('INBOX',1,25);$flaggedRow=array_values(array_filter($flagged['messages'],fn($m)=>$m['uid']===$uid))[0]??null;check($flaggedRow!==null&&$flaggedRow['flagged'],'IMAP star flag is reflected in message listing');
- check(count($read['attachments'])===1,'MIME attachment metadata parsed');
+ check(count($read['attachments'])===1,'MIME attachment metadata parsed');check($read['attachments'][0]['name']==='café probe.txt','RFC 2231 UTF-8 attachment filename decoded');
  $download=$imap->downloadPart('INBOX',$uid,$read['attachments'][0]['part']);check(str_contains($download['data'],'real attachment test'),'MIME attachment downloaded and decoded');
  $imap->setFlag('INBOX',$uid,'flagged',true);$imap->move('INBOX',$uid,'Milestone2Integration');$moved=$imap->messages('Milestone2Integration',1,25);check($moved['total']>0,'IMAP message moved to custom folder');
  $movedUid=(int)$moved['messages'][0]['uid'];$imap->delete('Milestone2Integration',$movedUid);check($imap->messages('Milestone2Integration',1,25)['total']===0,'IMAP message deleted and expunged');
