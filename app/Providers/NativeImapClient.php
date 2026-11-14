@@ -11,6 +11,8 @@ final class NativeImapClient implements ImapClientInterface
  public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760,array $folderRoles=[],int $timeout=20)
  {
   if(!function_exists('imap_open'))throw new \RuntimeException('PHP IMAP extension is required on this hosting account.');
+  if($timeout<1||$timeout>120)throw new \InvalidArgumentException('Invalid IMAP timeout.');
+  if(function_exists('imap_timeout')){imap_timeout(IMAP_OPENTIMEOUT,$timeout);imap_timeout(IMAP_READTIMEOUT,$timeout);imap_timeout(IMAP_WRITETIMEOUT,$timeout);imap_timeout(IMAP_CLOSETIMEOUT,min(10,$timeout));}
   if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid IMAP port.');
   $suffix=match($encryption){'ssl'=>'/imap/ssl/validate-cert','starttls'=>'/imap/tls/validate-cert','none'=>'/imap/notls',default=>throw new \InvalidArgumentException('Unsupported IMAP encryption mode.')};
   if($host===''||preg_match('/[\s{}\/\\\\\x00]/',$host))throw new \InvalidArgumentException('Invalid IMAP host.');
