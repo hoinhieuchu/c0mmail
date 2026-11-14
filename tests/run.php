@@ -24,6 +24,14 @@ test('HTML email sanitizer removes active content and unsafe attributes',functio
  same(true,str_contains($clean,'Safe content'));
  same(true,str_contains($clean,'Nested safe text'));
 });
+test('environment example exposes separate valid IMAP and SMTP settings',function(){
+ $config=Config::load(dirname(__DIR__).'/.env.example');
+ same('ssl',$config->get('MAIL_IMAP_ENCRYPTION'));
+ same('starttls',$config->get('MAIL_SMTP_ENCRYPTION'));
+ same('20',$config->get('MAIL_SMTP_TIMEOUT'));
+ same('25',$config->get('MAIL_PAGE_SIZE'));
+ same('INBOX',$config->get('MAIL_FOLDER_INBOX'));
+});
 test('password policy enforces minimum length and safe bounds',function(){
  $p=new PasswordPolicy();
  same(null,$p->validate('correct-horse-battery'));
