@@ -30,7 +30,10 @@ test('MIME builder folds long UTF-8 subjects and limits recipients',function(){
  $raw=$b->build(['from'=>'sender@example.test','to'=>'one@example.test','subject'=>str_repeat('Tiếng Việt ',20),'body'=>'body']);
  $headers=explode("\r\n\r\n",$raw,2)[0];
  same(true,str_contains($headers,'=?UTF-8?B?'));
+ same(false,(bool)preg_match('/^Bcc:/mi',$headers));
  foreach(explode("\r\n",$headers) as $line){if(str_starts_with($line,'Subject:')||str_starts_with($line,' '))same(true,strlen($line)<=78);}
+ try{$b->build(['from'=>'sender@example.test','to'=>"victim@example.test\r\nBcc: attacker@example.test",'subject'=>'test','body'=>'']);throw new RuntimeException('Expected header injection refusal');}
+ catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'Invalid email address'));}
  $recipients=array_fill(0,51,'user@example.test');
  try{$b->build(['from'=>'sender@example.test','to'=>$recipients,'subject'=>'test','body'=>'']);throw new RuntimeException('Expected recipient limit');}
  catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'50 recipients'));}
