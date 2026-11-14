@@ -44,6 +44,18 @@ curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /dev/null -X POST h
   --data-urlencode 'display_name=CI Member' --data-urlencode 'password=ci-member-password-123456'
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:8080/admin/members -o /tmp/c0mmail-members-created.html
 grep -q "$member_email" /tmp/c0mmail-members-created.html
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -D /tmp/c0mmail-mailbox-create-headers -o /tmp/c0mmail-mailbox-created.html \
+  -X POST http://127.0.0.1:8080/admin/mailboxes \
+  --data-urlencode "_csrf=$csrf" --data-urlencode "user_id=$(grep -oP 'action="/admin/members/\\K[0-9]+' /tmp/c0mmail-members-created.html | head -n1)" \
+  --data-urlencode 'local_part=ci-mailbox' --data-urlencode 'display_name=CI Mailbox' \
+  --data-urlencode 'password=ci-mailbox-password-123456'
+grep -q 'ci-mailbox-password-123456' /tmp/c0mmail-mailbox-created.html
+grep -qi '^Cache-Control: no-store, private' /tmp/c0mmail-mailbox-create-headers
+session_id=$(awk '$6=="c0mmail_ci"{print $7}' /tmp/c0mmail-cookies | tail -n1)
+session_dir=$(php -r 'echo session_save_path();')
+if [ -n "$session_dir" ] && [ -n "$session_id" ] && [ -f "$session_dir/sess_$session_id" ]; then
+  ! grep -Fq 'ci-mailbox-password-123456' "$session_dir/sess_$session_id"
+fi
 member_id=$(grep -oP 'action="/admin/members/\K[0-9]+(?=/status)' /tmp/c0mmail-members-created.html | head -n1)
 test -n "$member_id"
 curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /dev/null -X POST "http://127.0.0.1:8080/admin/members/$member_id/status" \
