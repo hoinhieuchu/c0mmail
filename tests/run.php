@@ -18,8 +18,9 @@ test('CraneMail adapter exposes SMTP and IMAP transport settings',function(){$p=
 test('router extracts named route parameters',function(){$r=new Router();$seen=null;$r->get('/mailboxes/{id}',function($p)use(&$seen){$seen=$p['id'];});ob_start();$r->dispatch('GET','/mailboxes/123');ob_end_clean();same('123',$seen);});
 test('MIME builder omits BCC header and supports drafts without To',function(){$b=new MimeMessageBuilder();$draft=$b->build(['from'=>'sender@example.test','subject'=>'Draft','body'=>'draft body'],true);same(false,str_contains($draft,'To:'));$sent=$b->build(['from'=>'sender@example.test','to'=>'to@example.test','bcc'=>'hidden@example.test','subject'=>'Hello','body'=>'body']);same(true,str_contains($sent,'To: to@example.test'));same(false,str_contains($sent,'Bcc:'));});
 test('HTML email sanitizer removes active content and unsafe attributes',function(){
- $clean=(new HtmlEmailSanitizer())->sanitize('<p onclick="alert(1)">Safe content</p><script>alert(2)</script><a href="javascript:alert(3)">unsafe</a><iframe src="https://evil.example"></iframe>');
+ $clean=(new HtmlEmailSanitizer())->sanitize('<p onclick="alert(1)">Safe content</p><script>alert(2)</script><a href="javascript:alert(3)">unsafe</a><iframe src="https://evil.example"></iframe><custom-wrap><script>alert(4)</script><p>Nested safe text</p></custom-wrap>');
  same(false,(bool)preg_match('/<script|<iframe|onclick\\s*=|javascript:/i',$clean));
  same(true,str_contains($clean,'Safe content'));
+ same(true,str_contains($clean,'Nested safe text'));
 });
 echo "{$count} tests passed.\n";
