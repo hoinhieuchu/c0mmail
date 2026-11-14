@@ -85,6 +85,18 @@ final class NativeImapClient implements ImapClientInterface
  }
  private function decodeBody(string $v,int $e):string{return match($e){3=>base64_decode($v,true)?:'',4=>quoted_printable_decode($v),default=>$v};}
  private function findPart(object $s,string $part):?object{$node=$s;foreach(explode('.',$part) as $i){$idx=(int)$i-1;if(!isset($node->parts[$idx]))return null;$node=$node->parts[$idx];}return $node;}
- private function partName(object $p):string{foreach(['dparameters','parameters'] as $k)foreach(($p->$k??[]) as $v)if(in_array(strtolower($v->attribute??''),['filename','name'],true))return (string)$v->value;return '';}
+ private function partName(object $p):string
+ {
+  $fallback='';
+  foreach(['dparameters','parameters'] as $key)foreach(($p->$key??[]) as $parameter){
+   $attribute=strtolower((string)($parameter->attribute??''));$value=$this->decode((string)($parameter->value??''));
+   if(in_array($attribute,['filename*','name*'],true)){
+    if(preg_match("/^[^']*''(.*)$/",$value,$match))return rawurldecode($match[1]);
+    return rawurldecode($value);
+   }
+   if(in_array($attribute,['filename','name'],true)&&$fallback==='')$fallback=$value;
+  }
+  return $fallback;
+ }
  private function type(object $p):string{$types=['TEXT','MULTIPART','MESSAGE','APPLICATION','AUDIO','IMAGE','VIDEO','OTHER'];return strtolower($types[$p->type??7]??'application').'/'.strtolower((string)($p->subtype??'octet-stream'));}
 }
