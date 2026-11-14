@@ -16,6 +16,6 @@ final class MailTransportFactory
  private function folderRoles():array{return ['inbox'=>$this->config->get('MAIL_FOLDER_INBOX','INBOX'),'sent'=>$this->config->get('MAIL_FOLDER_SENT',''),'drafts'=>$this->config->get('MAIL_FOLDER_DRAFTS',''),'spam'=>$this->config->get('MAIL_FOLDER_SPAM',''),'trash'=>$this->config->get('MAIL_FOLDER_TRASH','')];}
  public function smtp(array $mailbox):SmtpClientInterface
  {
-  return new SocketSmtpClient($this->config->required('MAIL_SMTP_HOST'),(int)$this->config->get('MAIL_SMTP_PORT','587'),$this->config->get('MAIL_SMTP_ENCRYPTION','starttls'),$mailbox['email'],$mailbox['password'],(int)$this->config->get('MAIL_SMTP_TIMEOUT','20'));
+  return new SocketSmtpClient($this->config->required('MAIL_SMTP_HOST'),(int)$this->config->get('MAIL_SMTP_PORT','587'),$this->config->get('MAIL_SMTP_ENCRYPTION','starttls'),$mailbox['email'],$mailbox['password'],(int)$this->config->get('MAIL_SMTP_TIMEOUT','20'),null,strtolower((string)$this->config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true');
  }
 }
