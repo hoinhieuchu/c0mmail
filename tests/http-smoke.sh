@@ -8,6 +8,7 @@ for attempt in {1..30}; do
   if curl -fsS http://127.0.0.1:8080/login -o /tmp/c0mmail-login.html; then break; fi
   sleep 1
 done
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:8080/login -o /tmp/c0mmail-login.html
 grep -q 'Sign in' /tmp/c0mmail-login.html
 csrf=$(grep -oP 'name="_csrf" value="\K[^"]+' /tmp/c0mmail-login.html | head -n1)
 test -n "$csrf"
