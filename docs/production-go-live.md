@@ -9,7 +9,8 @@ This application is a webmail client. The mail provider remains responsible for 
 - [ ] Keep `.env`, `app/`, `database/` and `bin/` outside the public document root.
 - [ ] Set `APP_ENV=production`, `APP_DEBUG=false`, and an HTTPS `APP_URL`.
 - [ ] Generate a unique 32-byte `APP_KEY`; back it up securely. Losing or rotating this key without re-encrypting mailbox credentials makes existing stored credentials unreadable.
-- [ ] Keep `MAIL_ALLOW_INSECURE_AUTH=false`.\n- [ ] Keep `LOGIN_RATE_LIMIT_IP_WIDE=false` unless `REMOTE_ADDR` is the real client IP and not a shared reverse-proxy address.
+- [ ] Keep `MAIL_ALLOW_INSECURE_AUTH=false`.
+- [ ] Keep `LOGIN_RATE_LIMIT_IP_WIDE=false` unless `REMOTE_ADDR` is the real client IP and not a shared reverse-proxy address.
 - [ ] Configure the provider's exact IMAP/SMTP hostnames, ports, TLS modes and timeouts.
 - [ ] Set PHP `upload_max_filesize` and `post_max_size` above the configured attachment total limit.
 
