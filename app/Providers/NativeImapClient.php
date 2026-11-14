@@ -11,8 +11,9 @@ final class NativeImapClient implements ImapClientInterface
  public function __construct(string $host,int $port,string $encryption,string $username,string $password,int $maxAttachmentBytes=10485760,array $folderRoles=[])
  {
   if(!function_exists('imap_open'))throw new \RuntimeException('PHP IMAP extension is required on this hosting account.');
-  if($port<1||$port>65535)throw new \\InvalidArgumentException('Invalid IMAP port.');\n  $suffix=match($encryption){'ssl'=>'/imap/ssl/validate-cert','starttls'=>'/imap/tls/validate-cert','none'=>'/imap/notls',default=>throw new \InvalidArgumentException('Unsupported IMAP encryption mode.')};
-  if(preg_match('/[{}\r\n]/',$host))throw new \InvalidArgumentException('Invalid IMAP host.');
+  if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid IMAP port.');
+  $suffix=match($encryption){'ssl'=>'/imap/ssl/validate-cert','starttls'=>'/imap/tls/validate-cert','none'=>'/imap/notls',default=>throw new \InvalidArgumentException('Unsupported IMAP encryption mode.')};
+  if($host===''||preg_match('/[\s{}\/\\\\\x00]/',$host))throw new \InvalidArgumentException('Invalid IMAP host.');
   $this->base='{'.$host.':'.$port.$suffix.'}';$this->maxAttachmentBytes=max(1,$maxAttachmentBytes);$this->folderRoles=$folderRoles;
   $this->stream=@imap_open($this->base.'INBOX',$username,$password,0,1,['DISABLE_AUTHENTICATOR'=>'GSSAPI']);
   if(!$this->stream)throw new \RuntimeException('IMAP connection failed: '.(imap_last_error()?:'authentication or network error'));
