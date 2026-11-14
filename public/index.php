@@ -36,6 +36,7 @@ if(!$debug)ini_set('display_errors','0');
 set_exception_handler(static function(\Throwable $exception)use($debug):void{error_log('Unhandled application exception: '.get_class($exception));if(!headers_sent()){http_response_code(500);header('Content-Type: text/plain; charset=UTF-8');}echo $debug?htmlspecialchars((string)$exception,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'):'An unexpected error occurred. Please try again.';});
 $isProduction=strtolower((string)$config->get('APP_ENV','production'))==='production';
 if($isProduction)header('Strict-Transport-Security: max-age=31536000');
+ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$isProduction,'samesite'=>'Lax']);session_start();}
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');$loginRateLimiter=new LoginRateLimiter($db,$config);
