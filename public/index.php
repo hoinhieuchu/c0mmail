@@ -44,9 +44,10 @@ if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeExcepti
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
 $service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view,$loginRateLimiter);$passwordPolicy=new PasswordPolicy();$accountController=new AccountController($auth,$users,$view,$passwordPolicy);$adminMembers=new AdminMemberController($auth,$users,$view,$passwordPolicy);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
-$admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
-$credentialService=new MailboxCredentialService($mailboxes,$config);$mime=new MimeMessageBuilder();
-$webmailService=new MailboxWebmailService(new MailTransportFactory($config),$config,$mime);
+$credentialService=new MailboxCredentialService($mailboxes,$config);$transports=new MailTransportFactory($config);
+$admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'),$credentialService,$transports);
+$mime=new MimeMessageBuilder();
+$webmailService=new MailboxWebmailService($transports,$config,$mime);
 $webmailController=new WebmailController($auth,$view,$credentialService,$webmailService,(int)$config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'),(int)$config->get('MAIL_ATTACHMENT_TOTAL_MAX_BYTES','20971520'));
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
@@ -61,7 +62,7 @@ $router->post('/mail/{id}/action',fn(array $p)=>$webmailController->action((int)
 $router->post('/mail/{id}/send',fn(array $p)=>$webmailController->send((int)$p['id']));
 $router->post('/mail/{id}/draft',fn(array $p)=>$webmailController->saveDraft((int)$p['id']));
 $router->post('/mail/{id}/folder',fn(array $p)=>$webmailController->createFolder((int)$p['id']));
-$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
+$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());$router->post('/admin/mailboxes/{id}/test',fn(array $p)=>$admin->testConnection((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/credentials',fn(array $p)=>$admin->updateCredentials((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/activate',fn(array $p)=>$admin->activateManual((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/suspend',fn(array $p)=>$admin->suspend((int)$p['id']));
