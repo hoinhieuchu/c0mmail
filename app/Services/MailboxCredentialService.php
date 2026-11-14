@@ -15,7 +15,7 @@ final class MailboxCredentialService
  public function forAdmin(int $mailboxId):array
  {
   $mailbox=$this->mailboxes->find($mailboxId);
-  if(!$mailbox||$mailbox['status']!=='active')throw new \RuntimeException('Mailbox is unavailable.');
+  if(!$mailbox||!in_array($mailbox['status'],['active','manual_pending'],true))throw new \RuntimeException('Mailbox is unavailable.');
   return $this->decrypt($mailbox);
  }
  private function decrypt(array $mailbox):array
