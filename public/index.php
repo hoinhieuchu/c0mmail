@@ -22,6 +22,7 @@ use App\Services\MailTransportFactory;
 use App\Services\MailboxWebmailService;
 use App\Services\MimeMessageBuilder;
 use App\Services\PasswordPolicy;
+use App\Services\LoginRateLimiter;
 require dirname(__DIR__).'/app/bootstrap.php';
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
