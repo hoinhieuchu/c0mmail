@@ -9,6 +9,7 @@ use App\Controllers\AuthController;
 use App\Controllers\DashboardController;
 use App\Controllers\AdminMailboxController;
 use App\Controllers\WebmailController;
+use App\Controllers\AccountController;
 use App\Providers\LocalSessionMemberProvider;
 use App\Providers\ManualMailProvider;
 use App\Providers\CraneMailProvider;
@@ -19,6 +20,7 @@ use App\Services\MailboxCredentialService;
 use App\Services\MailTransportFactory;
 use App\Services\MailboxWebmailService;
 use App\Services\MimeMessageBuilder;
+use App\Services\PasswordPolicy;
 require dirname(__DIR__).'/app/bootstrap.php';
 $config=Config::load(dirname(__DIR__).'/.env');
 if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$config->get('APP_ENV')==='production','samesite'=>'Lax']);session_start();}
@@ -36,7 +38,8 @@ $webmailController=new WebmailController($auth,$view,$credentialService,$webmail
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
 $router->get('/login',fn()=>$authController->showLogin());$router->post('/login',fn()=>$authController->login());$router->post('/logout',fn()=>$authController->logout());
-$router->get('/dashboard',fn()=>$dashboard->index());\n$router->get('/account/password',fn()=>$accountController->showPassword());$router->post('/account/password',fn()=>$accountController->updatePassword());
+$router->get('/dashboard',fn()=>$dashboard->index());
+$router->get('/account/password',fn()=>$accountController->showPassword());$router->post('/account/password',fn()=>$accountController->updatePassword());
 $router->get('/mail/{id}',fn(array $p)=>$webmailController->index((int)$p['id']));
 $router->get('/mail/{id}/message/{uid}',fn(array $p)=>$webmailController->showMessage((int)$p['id'],(int)$p['uid']));
 $router->get('/mail/{id}/download/{uid}',fn(array $p)=>$webmailController->download((int)$p['id'],(int)$p['uid']));
