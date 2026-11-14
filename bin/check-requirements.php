@@ -11,9 +11,12 @@ $errors=0;
 $warnings=0;
 
 $report=static function(string $label,bool $ok,string $severity='error')use(&$errors,&$warnings):void{
-    if($ok){echo "[PASS] {$label}\n";return;}
-    if($severity==='warning'){$warnings++;echo "[WARN] {$label}\n";return;}
-    $errors++;echo "[FAIL] {$label}\n";
+    if($ok){echo "[PASS] {$label}
+";return;}
+    if($severity==='warning'){$warnings++;echo "[WARN] {$label}
+";return;}
+    $errors++;echo "[FAIL] {$label}
+";
 };
 
 $report('PHP 8.1 or newer',PHP_VERSION_ID>=80100);
@@ -47,9 +50,14 @@ foreach(['MAIL_IMAP_ENCRYPTION','MAIL_SMTP_ENCRYPTION'] as $name){
     $severity=$mode==='none'&&$appEnv!=='production'?'warning':'error';
     $report("Configuration: {$name} uses SSL/TLS",$mode==='ssl'||$mode==='starttls',$severity);
 }
-$imapTimeout=(int)$config->get('MAIL_IMAP_TIMEOUT','20');\n$report('MAIL_IMAP_TIMEOUT is between 1 and 120 seconds',$imapTimeout>=1&&$imapTimeout<=120);\n$allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
+$imapTimeout=(int)$config->get('MAIL_IMAP_TIMEOUT','20');
+$report('MAIL_IMAP_TIMEOUT is between 1 and 120 seconds',$imapTimeout>=1&&$imapTimeout<=120);
+$allowInsecure=strtolower((string)$config->get('MAIL_ALLOW_INSECURE_AUTH','false'))==='true';
 $report('Insecure SMTP authentication is disabled in production',!($appEnv==='production'&&$allowInsecure));
 
-echo "\n";
-echo $errors===0?"Preflight passed with {$warnings} warning(s). No network connectivity test was performed.\n":"Preflight failed: {$errors} error(s), {$warnings} warning(s). No network connectivity test was performed.\n";
+echo "
+";
+echo $errors===0?"Preflight passed with {$warnings} warning(s). No network connectivity test was performed.
+":"Preflight failed: {$errors} error(s), {$warnings} warning(s). No network connectivity test was performed.
+";
 exit($errors===0?0:1);
