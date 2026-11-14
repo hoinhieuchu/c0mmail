@@ -15,7 +15,7 @@ final class SocketSmtpClient implements SmtpClientInterface
   if($this->host===''||preg_match('/[\s{}\/\\\\\x00]/',$this->host))throw new \InvalidArgumentException('Invalid SMTP host.');
   if(!in_array($this->encryption,['ssl','starttls','none'],true))throw new \InvalidArgumentException('Unsupported SMTP encryption mode.');
   if($this->username!==''&&$this->encryption==='none'&&!$this->allowInsecureAuth)throw new \RuntimeException('SMTP authentication over an unencrypted connection is disabled. Enable SSL/TLS or explicitly allow insecure authentication only for a trusted private mail server.');
-  $remote=($this->encryption==='ssl'?'ssl://':'tcp://').$this->host.':'.$this->port;$errno=0;$errstr='';
+  $socketHost=filter_var($this->host,FILTER_VALIDATE_IP,FILTER_FLAG_IPV6)!==false?'['.$this->host.']':$this->host;$remote=($this->encryption==='ssl'?'ssl://':'tcp://').$socketHost.':'.$this->port;$errno=0;$errstr='';
   $s=@stream_socket_client($remote,$errno,$errstr,$this->timeout,STREAM_CLIENT_CONNECT,stream_context_create(['ssl'=>['verify_peer'=>true,'verify_peer_name'=>true]]));
   if(!$s)throw new \RuntimeException('SMTP connection failed ('.$errno.').');stream_set_timeout($s,$this->timeout);
   try{
