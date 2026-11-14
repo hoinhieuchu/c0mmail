@@ -20,18 +20,24 @@ if($argc===3){
 }else{
     fwrite(STDOUT,"Administrator password (minimum 14 characters): ");
     $terminalState=null;
-    if(PHP_OS_FAMILY!=='Windows'&&function_exists('stream_isatty')&&stream_isatty(STDIN)&&function_exists('shell_exec')){
-        $state=trim((string)@shell_exec('stty -g 2>/dev/null'));
-        if($state!==''){
-            $terminalState=$state;
-            @shell_exec('stty -echo');
+    if(PHP_OS_FAMILY!=='Windows'&&function_exists('stream_isatty')&&stream_isatty(STDIN)){
+        if(function_exists('shell_exec')){
+            $state=trim((string)@shell_exec('stty -g 2>/dev/null'));
+            if($state!==''){
+                $terminalState=$state;
+                @shell_exec('stty -echo');
+                register_shutdown_function(static function()use(&$terminalState):void{if($terminalState!==null){@shell_exec('stty '.escapeshellarg($terminalState));$terminalState=null;}});
+            }else{
+                fwrite(STDERR,"\nWarning: terminal echo could not be disabled; use a secure input method.\n");
+            }
         }else{
-            fwrite(STDERR,"\nWarning: terminal echo could not be disabled; use a secure input method.\n");
+            fwrite(STDERR,"\nWarning: shell_exec is disabled; password input may be echoed. Use a secure input method.\n");
         }
     }
     $input=fgets(STDIN);
     if($terminalState!==null){
         @shell_exec('stty '.escapeshellarg($terminalState));
+        $terminalState=null;
         fwrite(STDOUT,"\n");
     }
     $password=$input===false?'':rtrim($input,"\r\n");
