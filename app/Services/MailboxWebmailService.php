@@ -25,6 +25,26 @@ final class MailboxWebmailService
   $folders=$this->folders($credentials);$drafts=$this->roleFolder($folders,'drafts');if($drafts===null)throw new \RuntimeException('The mail server does not expose a Drafts folder.');
   $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);try{$imap->append($drafts,$raw,'\\Draft');}finally{$imap->close();}
  }
+
+ public function replaceDraft(array $credentials,string $folder,int $uid,array $message):void
+ {
+  if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->preserveAttachments($credentials,$folder,$uid,$original['attachments']);
+  $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);
+  try{$imap->append($folder,$raw,'\\Draft');$imap->delete($folder,$uid);}finally{$imap->close();}
+ }
+ public function sendDraft(array $credentials,string $folder,int $uid,array $message):void
+ {
+  if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->preserveAttachments($credentials,$folder,$uid,$original['attachments']);
+  $this->send($credentials,$message);$imap=$this->transports->imap($credentials);
+  try{$imap->delete($folder,$uid);}finally{$imap->close();}
+ }
+ private function preserveAttachments(array $credentials,string $folder,int $uid,array $metadata):array
+ {
+  $files=[];foreach($metadata as $attachment){$file=$this->download($credentials,$folder,$uid,(string)$attachment['part']);$files[]=['name'=>$file['name'],'type'=>$file['type'],'data'=>$file['data']];}
+  return $files;
+ }
  public function send(array $credentials,array $message):void
  {
   $message['from']=$credentials['email'];$raw=$this->mime->build($message);$message['raw']=$raw;
