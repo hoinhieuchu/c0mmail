@@ -15,7 +15,8 @@ $mime=new MimeMessageBuilder();$webmail=new MailboxWebmailService(new MailTransp
 $imap=new NativeImapClient($host,$imapPort,'none',$user,$pass);
 try{
  $folders=$imap->folders();check((bool)array_filter($folders,fn($f)=>strtoupper($f['path'])==='INBOX'),'IMAP INBOX exists');
- foreach(['Milestone2Integration','Sent','Sent Items','Drafts'] as $folder){if(!array_filter($folders,fn($f)=>$f['path']===$folder))$imap->createFolder($folder);}
+ foreach(['Milestone2Integration','Sent','Sent Items','Drafts','Presentations'] as $folder){if(!array_filter($folders,fn($f)=>$f['path']===$folder))$imap->createFolder($folder);}
+ $roleFolders=$imap->folders();$presentationFolder=array_values(array_filter($roleFolders,fn($f)=>$f['path']==='Presentations'))[0]??null;check($presentationFolder!==null&&$presentationFolder['role']==='custom','IMAP role detection does not misclassify folders containing the word sent');
  $tmp=tempnam(sys_get_temp_dir(),'c0m-');file_put_contents($tmp,"real attachment test\n");
  $smtpVerifier=new SocketSmtpClient($host,$smtpPort,'none',$email,$pass,20,null,true);$smtpVerifier->verify();check(true,'SMTP AUTH LOGIN verified without sending a message');
  $message=['from'=>$email,'to'=>$email,'subject'=>'c0m.me Mail integration '.bin2hex(random_bytes(4)),'body'=>'Message delivered through the test SMTP server. Nội dung tiếng Việt để kiểm thử.','attachments'=>[['name'=>'café probe.txt','path'=>$tmp,'type'=>'text/plain']]];
