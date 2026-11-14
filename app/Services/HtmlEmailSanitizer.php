@@ -67,6 +67,7 @@ final class HtmlEmailSanitizer
                 continue;
             }
             if (!in_array($tag, self::ALLOWED, true)) {
+                $this->cleanChildren($node);
                 while ($node->firstChild) {
                     $parent->insertBefore($node->firstChild, $node);
                 }
