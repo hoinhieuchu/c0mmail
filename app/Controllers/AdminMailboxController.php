@@ -12,12 +12,12 @@ final class AdminMailboxController
     public function __construct(private Auth $auth,private UserRepository $users,private MailboxRepository $mailboxes,private MailboxService $service,private View $view,private string $providerName,private string $mailDomain){}
     public function index():void
     {
-        $this->auth->requireAdmin();$created=$_SESSION['created_mailbox']??null;unset($_SESSION['created_mailbox']);
-        $notice=$_SESSION['mailbox_notice']??null;unset($_SESSION['mailbox_notice']);$this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'notice'=>$notice,'created'=>$created,'providerName'=>$this->providerName]);
+        $admin=$this->auth->requireAdmin();$created=$_SESSION['created_mailbox']??null;unset($_SESSION['created_mailbox']);
+        $notice=$_SESSION['mailbox_notice']??null;unset($_SESSION['mailbox_notice']);$this->view->render('admin/mailboxes',['title'=>'Mailbox administration','user'=>$admin,'members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'notice'=>$notice,'created'=>$created,'providerName'=>$this->providerName]);
     }
     public function create():void
     {
-        $this->auth->requireAdmin();Csrf::verify();
+        $admin=$this->auth->requireAdmin();Csrf::verify();
         try {
             $local=trim((string)($_POST['local_part']??''));$name=trim((string)($_POST['display_name']??''));$password=(string)($_POST['password']??'');
             if(!preg_match('/^[a-zA-Z0-9._+-]{1,64}$/',$local))throw new \InvalidArgumentException('Local part contains unsupported characters.');
@@ -26,7 +26,7 @@ final class AdminMailboxController
             $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password];
             header('Location: /admin/mailboxes');exit;
         } catch (\Throwable $e) {
-            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'notice'=>null,'created'=>null,'providerName'=>$this->providerName]);
+            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','user'=>$admin,'members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'notice'=>null,'created'=>null,'providerName'=>$this->providerName]);
         }
     }
     public function activateManual(int $id):void
