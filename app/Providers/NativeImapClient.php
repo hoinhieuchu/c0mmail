@@ -16,7 +16,7 @@ final class NativeImapClient implements ImapClientInterface
   if($port<1||$port>65535)throw new \InvalidArgumentException('Invalid IMAP port.');
   $suffix=match($encryption){'ssl'=>'/imap/ssl/validate-cert','starttls'=>'/imap/tls/validate-cert','none'=>'/imap/notls',default=>throw new \InvalidArgumentException('Unsupported IMAP encryption mode.')};
   if($host===''||preg_match('/[\s{}\/\\\\\x00]/',$host))throw new \InvalidArgumentException('Invalid IMAP host.');
-  $this->base='{'.$host.':'.$port.$suffix.'}';$this->maxAttachmentBytes=max(1,$maxAttachmentBytes);$this->folderRoles=$folderRoles;
+  $imapHost=filter_var($host,FILTER_VALIDATE_IP,FILTER_FLAG_IPV6)!==false?'['.$host.']':$host;$this->base='{'.$imapHost.':'.$port.$suffix.'}';$this->maxAttachmentBytes=max(1,$maxAttachmentBytes);$this->folderRoles=$folderRoles;
   $this->stream=@imap_open($this->base.'INBOX',$username,$password,0,1,['DISABLE_AUTHENTICATOR'=>'GSSAPI']);
   if(!$this->stream)throw new \RuntimeException('IMAP connection failed: '.(imap_last_error()?:'authentication or network error'));
  }
