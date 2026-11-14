@@ -29,33 +29,33 @@ final class MailboxWebmailService
  public function replaceDraft(array $credentials,string $folder,int $uid,array $message):void
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
-  $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->draftAttachments($credentials,$folder,$uid,$original['attachments'],$message['attachments']??[]);
   $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);
   try{$imap->append($folder,$raw,'\\Draft');$imap->delete($folder,$uid);}finally{$imap->close();}
  }
  public function sendDraft(array $credentials,string $folder,int $uid,array $message):array
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
-  $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->draftAttachments($credentials,$folder,$uid,$original['attachments'],$message['attachments']??[]);
   $sentCopySaved=$this->send($credentials,$message);$draftRemoved=false;$imap=null;
   try{$imap=$this->transports->imap($credentials);$imap->delete($folder,$uid);$draftRemoved=true;}catch(\Throwable $e){error_log('Draft cleanup failed after SMTP delivery was accepted.');}finally{if($imap!==null)$imap->close();}return ['sent_copy_saved'=>$sentCopySaved,'draft_removed'=>$draftRemoved];
  }
  private function draftAttachments(array $credentials,string $folder,int $uid,array $metadata,array $newFiles):array
  {
-  if(count($metadata)+count($newFiles)>5)throw new \\InvalidArgumentException('A maximum of five attachments is allowed per message.');
+  if(count($metadata)+count($newFiles)>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
   $maxFile=max(1,(int)$this->config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'));
   $maxTotal=max(1,(int)$this->config->get('MAIL_ATTACHMENT_TOTAL_MAX_BYTES','20971520'));
   $knownTotal=0;
   foreach($metadata as $attachment){
    $size=(int)($attachment['size']??0);$knownTotal+=$size;
-   if($size<1||$size>$maxFile||$knownTotal>$maxTotal)throw new \\InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
+   if($size<1||$size>$maxFile||$knownTotal>$maxTotal)throw new \InvalidArgumentException('Existing draft attachments exceed the configured size limits.');
   }
   $preserved=$this->preserveAttachments($credentials,$folder,$uid,$metadata);
   $all=array_merge($preserved,$newFiles);$total=0;
   foreach($all as $attachment){
    $size=array_key_exists('data',$attachment)?strlen((string)$attachment['data']):(int)(filesize((string)($attachment['path']??''))?:0);
    $total+=$size;
-   if($size<1||$size>$maxFile||$total>$maxTotal)throw new \\InvalidArgumentException('Combined draft attachments exceed the configured size limits.');
+   if($size<1||$size>$maxFile||$total>$maxTotal)throw new \InvalidArgumentException('Combined draft attachments exceed the configured size limits.');
   }
   return $all;
  }
