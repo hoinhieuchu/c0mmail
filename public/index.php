@@ -47,7 +47,7 @@ $router->post('/mail/{id}/action',fn(array $p)=>$webmailController->action((int)
 $router->post('/mail/{id}/send',fn(array $p)=>$webmailController->send((int)$p['id']));
 $router->post('/mail/{id}/draft',fn(array $p)=>$webmailController->saveDraft((int)$p['id']));
 $router->post('/mail/{id}/folder',fn(array $p)=>$webmailController->createFolder((int)$p['id']));
-$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
+$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());\n$router->post('/admin/mailboxes/{id}/credentials',fn(array $p)=>$admin->updateCredentials((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/activate',fn(array $p)=>$admin->activateManual((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/suspend',fn(array $p)=>$admin->suspend((int)$p['id']));
 $router->dispatch($_SERVER['REQUEST_METHOD']??'GET',parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/');
