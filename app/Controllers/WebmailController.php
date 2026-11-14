@@ -1,12 +1,12 @@
 <?php
 declare(strict_types=1);
-namespace App\\Controllers;
-use App\\Core\\Auth;
-use App\\Core\\Csrf;
-use App\\Core\\View;
-use App\\Services\\MailboxCredentialService;
-use App\\Services\\MailboxWebmailService;
-use App\\Services\\HtmlEmailSanitizer;
+namespace App\Controllers;
+use App\Core\Auth;
+use App\Core\Csrf;
+use App\Core\View;
+use App\Services\MailboxCredentialService;
+use App\Services\MailboxWebmailService;
+use App\Services\HtmlEmailSanitizer;
 final class WebmailController
 {
  public function __construct(private Auth $auth,private View $view,private MailboxCredentialService $credentials,private MailboxWebmailService $webmail,private int $maxAttachmentBytes=10485760,private int $maxTotalBytes=20971520){}
@@ -27,15 +27,15 @@ final class WebmailController
  public function action(int $id):void
  {
   $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$folder=(string)($_POST['folder']??'INBOX');$uid=(int)($_POST['uid']??0);$action=(string)($_POST['action']??'');
-  if($uid<1)throw new \\InvalidArgumentException('Invalid message identifier.');
-  match($action){'read'=>$this->webmail->flag($creds,$folder,$uid,'seen',true),'unread'=>$this->webmail->flag($creds,$folder,$uid,'seen',false),'star'=>$this->webmail->flag($creds,$folder,$uid,'flagged',true),'unstar'=>$this->webmail->flag($creds,$folder,$uid,'flagged',false),'delete'=>$this->webmail->delete($creds,$folder,$uid),'move'=>$this->webmail->move($creds,$folder,$uid,(string)($_POST['destination']??'')),default=>throw new \\InvalidArgumentException('Unknown mail action.')};
+  if($uid<1)throw new \InvalidArgumentException('Invalid message identifier.');
+  match($action){'read'=>$this->webmail->flag($creds,$folder,$uid,'seen',true),'unread'=>$this->webmail->flag($creds,$folder,$uid,'seen',false),'star'=>$this->webmail->flag($creds,$folder,$uid,'flagged',true),'unstar'=>$this->webmail->flag($creds,$folder,$uid,'flagged',false),'delete'=>$this->webmail->delete($creds,$folder,$uid),'move'=>$this->webmail->move($creds,$folder,$uid,(string)($_POST['destination']??'')),default=>throw new \InvalidArgumentException('Unknown mail action.')};
   header('Location: /mail/'.$id.'?folder='.rawurlencode($folder));exit;
  }
  public function send(int $id):void
  {
   $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$attachments=$this->uploads();
   $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$attachments];
-  if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \\InvalidArgumentException('Message content exceeds the allowed size.');
+  if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
   if(($_POST['mode']??'send')==='draft'){$this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;}
   $this->webmail->send($creds,$message);header('Location: /mail/'.$id.'?sent=1');exit;
  }
@@ -45,7 +45,7 @@ final class WebmailController
   $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$this->uploads()];
   $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;
  }
- public function createFolder(int $id):void{$user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$name=trim((string)($_POST['name']??''));if(strlen($name)>100)throw new \\InvalidArgumentException('Folder name is too long.');$this->webmail->createFolder($creds,$name);header('Location: /mail/'.$id.'?folder='.rawurlencode($name));exit;}
+ public function createFolder(int $id):void{$user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$name=trim((string)($_POST['name']??''));if(strlen($name)>100)throw new \InvalidArgumentException('Folder name is too long.');$this->webmail->createFolder($creds,$name);header('Location: /mail/'.$id.'?folder='.rawurlencode($name));exit;}
  public function download(int $id,int $uid):void
  {
   $user=$this->auth->requireLogin();$creds=$this->credentials->forUser($id,(int)$user['id']);$file=$this->webmail->download($creds,(string)($_GET['folder']??'INBOX'),$uid,(string)($_GET['part']??''));
@@ -54,7 +54,7 @@ final class WebmailController
  private function uploads():array
  {
   $files=$_FILES['attachments']??null;if(!$files||!is_array($files['name']??null))return [];$out=[];$total=0;$max=(int)$this->maxAttachmentBytes;$totalMax=(int)$this->maxTotalBytes;
-  foreach($files['name'] as $i=>$name){if(($files['error'][$i]??UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_NO_FILE)continue;if(($files['error'][$i]??-1)!==UPLOAD_ERR_OK)throw new \\RuntimeException('Attachment upload failed.');$size=(int)$files['size'][$i];$total+=$size;if($size<1||$size>$max||$total>$totalMax)throw new \\InvalidArgumentException('Attachment size limit exceeded.');$tmp=$files['tmp_name'][$i];if(!is_uploaded_file($tmp))throw new \\RuntimeException('Invalid uploaded attachment.');$safe=basename((string)$name);if(preg_match('/\\.(php[0-9]?|phtml|phar|cgi|exe|js|html?|svg)$/i',$safe))throw new \\InvalidArgumentException('This attachment file type is not allowed.');$out[]=['name'=>$safe,'path'=>$tmp,'type'=>function_exists('mime_content_type')?(mime_content_type($tmp)?:'application/octet-stream'):'application/octet-stream'];if(count($out)>5)throw new \\InvalidArgumentException('A maximum of five attachments is allowed.');}
+  foreach($files['name'] as $i=>$name){if(($files['error'][$i]??UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_NO_FILE)continue;if(($files['error'][$i]??-1)!==UPLOAD_ERR_OK)throw new \RuntimeException('Attachment upload failed.');$size=(int)$files['size'][$i];$total+=$size;if($size<1||$size>$max||$total>$totalMax)throw new \InvalidArgumentException('Attachment size limit exceeded.');$tmp=$files['tmp_name'][$i];if(!is_uploaded_file($tmp))throw new \RuntimeException('Invalid uploaded attachment.');$safe=basename((string)$name);if(preg_match('/\.(php[0-9]?|phtml|phar|cgi|exe|js|html?|svg)$/i',$safe))throw new \InvalidArgumentException('This attachment file type is not allowed.');$out[]=['name'=>$safe,'path'=>$tmp,'type'=>function_exists('mime_content_type')?(mime_content_type($tmp)?:'application/octet-stream'):'application/octet-stream'];if(count($out)>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed.');}
   return $out;
  }
  private function composeDefaults(array $creds,string $folder):array{return ['to'=>'','cc'=>'','bcc'=>'','subject'=>'','body'=>''];}
