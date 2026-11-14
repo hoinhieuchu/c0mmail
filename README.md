@@ -11,7 +11,7 @@ Local authentication, admin/member roles, a replaceable identity provider interf
 - Native PHP IMAP adapter: folder discovery, message listing, UID-based pagination, text search, MIME body/attachment parsing, read/unread and star flags, move, delete/expunge, custom folder creation, APPEND for drafts and Sent copies.
 - Socket SMTP adapter: SMTP AUTH LOGIN, implicit TLS or STARTTLS, message delivery, To/CC/BCC, UTF-8 subject/body, MIME attachments and dot-stuffing.
 - Provider-neutral IMAP/SMTP interfaces; mailbox passwords are decrypted only for a request and are never stored in the PHP session or logged.
-- Browser UI for folders, message reading, compose, reply, forward, CC/BCC, attachments, draft saving, search and pagination.
+- Browser UI for folders, message reading, sandboxed HTML email preview with an allowlist sanitizer, compose, reply, forward, CC/BCC, attachments, draft saving, search and pagination.
 - Attachment upload defaults: 10 MiB per file, 20 MiB total, maximum five files. Executable/script/web page file extensions are blocked. Downloads are forced as attachments.
 
 ## Requirements
@@ -45,4 +45,4 @@ The app expects the provider to expose standard IMAP and SMTP services. No Crane
 
 Use HTTPS, keep `.env` outside the web root, use a unique 32-byte app key, and restrict admin access. The application does not log mailbox passwords or SMTP/IMAP authentication exchanges. Rotate a mailbox password at the provider and update it in the encrypted mailbox record when changing credentials. Do not expose downloaded attachments inline. Configure PHP upload/post limits to match the app's attachment limits.
 
-Still outstanding: password change/reset UI, robust HTML email sanitization/rendering, inline images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
+Still outstanding: password change/reset UI, inline CID images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
