@@ -5,6 +5,7 @@ use App\Core\Config;
 use App\Repositories\UserRepository;
 use App\Repositories\MailboxRepository;
 use App\Services\MailboxCredentialService;
+use App\Services\LoginRateLimiter;
 
 function dbCheck(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);echo "PASS {$message}\n";}
 $host=getenv('DB_HOST')?:'127.0.0.1';$port=getenv('DB_PORT')?:'3306';$database=getenv('DB_DATABASE')?:'c0mmail';$username=getenv('DB_USERNAME')?:'c0m';$password=getenv('DB_PASSWORD')?:'secret';
@@ -15,7 +16,8 @@ try{
  $users->setMemberStatus($userId,'suspended');dbCheck($users->findById($userId)['status']==='suspended','Member suspension is persisted');$users->setMemberStatus($userId,'active');dbCheck($users->findById($userId)['status']==='active','Member reactivation is persisted');
  $oldHash=$users->passwordHashForId($userId);$newHash=password_hash('new-test-password-456',PASSWORD_DEFAULT);dbCheck($oldHash!==null&&$users->updatePasswordHash($userId,$oldHash,$newHash),'Password hash update uses compare-and-swap');
  dbCheck(password_verify('new-test-password-456',$users->passwordHashForId($userId)??''),'Updated password hash is persisted');dbCheck(!$users->updatePasswordHash($userId,$oldHash,password_hash('stale-password-789',PASSWORD_DEFAULT)),'Stale password update is rejected');
- $key=random_bytes(32);$nonce=random_bytes(12);$tag='';$cipher=openssl_encrypt('mailbox-secret-one','aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);if($cipher===false)throw new RuntimeException('Test credential encryption failed.');
+ $key=random_bytes(32);$rateLimiter=new LoginRateLimiter($pdo,new Config(['APP_KEY'=>'base64:'.base64_encode($key)]));$rateEmail='rate-'.bin2hex(random_bytes(4)).'@example.test';$rateIp='198.51.100.42';dbCheck(!$rateLimiter->isBlocked($rateEmail,$rateIp),'Fresh login identity is not throttled');for($attempt=0;$attempt<10;$attempt++)$rateLimiter->recordFailure($rateEmail,$rateIp);dbCheck($rateLimiter->isBlocked($rateEmail,$rateIp),'Ten failed login attempts trigger throttling');$rateLimiter->recordSuccess($rateEmail);dbCheck(!$rateLimiter->isBlocked($rateEmail,$rateIp),'Successful login clears prior failed attempts');
+ $nonce=random_bytes(12);$tag='';$cipher=openssl_encrypt('mailbox-secret-one','aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);if($cipher===false)throw new RuntimeException('Test credential encryption failed.');
  $mailboxId=$mailboxes->create(['user_id'=>$userId,'email'=>$mailboxEmail,'display_name'=>'Test mailbox','provider'=>'manual','provider_id'=>null,'status'=>'active','ciphertext'=>base64_encode($cipher),'nonce'=>bin2hex($nonce),'tag'=>bin2hex($tag)]);
  dbCheck($mailboxes->findForUser($mailboxId,$userId)!==null,'Mailbox ownership lookup works');dbCheck($mailboxes->findForUser($mailboxId,$userId+1)===null,'Mailbox credentials are scoped to their owner');
  $config=new Config(['APP_KEY'=>'base64:'.base64_encode($key)]);$credentialService=new MailboxCredentialService($mailboxes,$config);dbCheck($credentialService->forUser($mailboxId,$userId)['password']==='mailbox-secret-one','AES-256-GCM mailbox credentials decrypt for the owning member');
