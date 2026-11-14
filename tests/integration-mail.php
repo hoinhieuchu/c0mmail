@@ -9,7 +9,7 @@ use App\Services\MailboxWebmailService;
 function check(bool $ok,string $message):void{if(!$ok)throw new RuntimeException($message);echo "PASS {$message}\n";}
 $host=getenv('MAIL_TEST_HOST')?:'127.0.0.1';$imapPort=(int)(getenv('MAIL_TEST_IMAP_PORT')?:3143);$smtpPort=(int)(getenv('MAIL_TEST_SMTP_PORT')?:3025);$user=getenv('MAIL_TEST_USER')?:'test@example.com';$email=getenv('MAIL_TEST_EMAIL')?:'test@example.com';$pass=getenv('MAIL_TEST_PASSWORD')?:'secret';
 check(function_exists('imap_open'),'PHP IMAP extension loaded');
-$config=new Config(['MAIL_IMAP_HOST'=>$host,'MAIL_IMAP_PORT'=>(string)$imapPort,'MAIL_IMAP_ENCRYPTION'=>'none','MAIL_FOLDER_SENT'=>'Sent Items','MAIL_FOLDER_DRAFTS'=>'Drafts','MAIL_SMTP_HOST'=>$host,'MAIL_SMTP_PORT'=>(string)$smtpPort,'MAIL_SMTP_ENCRYPTION'=>'none','MAIL_PAGE_SIZE'=>'25']);
+$config=new Config(['MAIL_IMAP_HOST'=>$host,'MAIL_IMAP_PORT'=>(string)$imapPort,'MAIL_IMAP_ENCRYPTION'=>'none','MAIL_FOLDER_SENT'=>'Sent Items','MAIL_FOLDER_DRAFTS'=>'Drafts','MAIL_SMTP_HOST'=>$host,'MAIL_SMTP_PORT'=>(string)$smtpPort,'MAIL_SMTP_ENCRYPTION'=>'none','MAIL_ALLOW_INSECURE_AUTH'=>'true','MAIL_PAGE_SIZE'=>'25']);
 $mime=new MimeMessageBuilder();$webmail=new MailboxWebmailService(new MailTransportFactory($config),$config,$mime);
 $imap=new NativeImapClient($host,$imapPort,'none',$user,$pass);
 try{
