@@ -33,12 +33,12 @@ final class MailboxWebmailService
   $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);
   try{$imap->append($folder,$raw,'\\Draft');$imap->delete($folder,$uid);}finally{$imap->close();}
  }
- public function sendDraft(array $credentials,string $folder,int $uid,array $message):bool
+ public function sendDraft(array $credentials,string $folder,int $uid,array $message):array
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
   $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed per message.');
-  $sentCopySaved=$this->send($credentials,$message);$imap=$this->transports->imap($credentials);
-  try{$imap->delete($folder,$uid);}finally{$imap->close();}return $sentCopySaved;
+  $sentCopySaved=$this->send($credentials,$message);$draftRemoved=false;$imap=$this->transports->imap($credentials);
+  try{$imap->delete($folder,$uid);$draftRemoved=true;}catch(\\Throwable $e){error_log('Draft cleanup failed after SMTP delivery was accepted.');}finally{$imap->close();}return ['sent_copy_saved'=>$sentCopySaved,'draft_removed'=>$draftRemoved];
  }
  private function preserveAttachments(array $credentials,string $folder,int $uid,array $metadata):array
  {
