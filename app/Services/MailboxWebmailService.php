@@ -29,14 +29,14 @@ final class MailboxWebmailService
  public function replaceDraft(array $credentials,string $folder,int $uid,array $message):void
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
-  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->preserveAttachments($credentials,$folder,$uid,$original['attachments']);
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \\InvalidArgumentException('A maximum of five attachments is allowed per message.');
   $raw=$this->mime->build($message,true);$imap=$this->transports->imap($credentials);
   try{$imap->append($folder,$raw,'\\Draft');$imap->delete($folder,$uid);}finally{$imap->close();}
  }
  public function sendDraft(array $credentials,string $folder,int $uid,array $message):void
  {
   if($uid<1)throw new \InvalidArgumentException('Invalid draft identifier.');
-  $original=$this->message($credentials,$folder,$uid);$message['attachments']=$this->preserveAttachments($credentials,$folder,$uid,$original['attachments']);
+  $original=$this->message($credentials,$folder,$uid);$message['attachments']=array_merge($this->preserveAttachments($credentials,$folder,$uid,$original['attachments']),$message['attachments']??[]);if(count($message['attachments'])>5)throw new \\InvalidArgumentException('A maximum of five attachments is allowed per message.');
   $this->send($credentials,$message);$imap=$this->transports->imap($credentials);
   try{$imap->delete($folder,$uid);}finally{$imap->close();}
  }
