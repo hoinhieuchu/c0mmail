@@ -12,7 +12,7 @@ final class MimeMessageBuilder
   if($to)$headers[]=$this->foldAddresses('To',$to);
   if($cc)$headers[]=$this->foldAddresses('Cc',$cc);
   if($allowEmptyTo&&trim((string)($m['bcc']??''))!=='')$headers[]=$this->foldAddresses('X-C0m-Draft-Bcc',$bcc);
-  $domain=substr(strrchr((string)$m['from'],'@')?:'@localhost',1);
+  $senderAddress=$from;if(preg_match('/<?([^<>\\s]+@[^<>\\s]+)>?$/',$from,$senderMatch))$senderAddress=$senderMatch[1];\n  $domain=substr(strrchr($senderAddress,'@')?:'@localhost',1);
   $headers[]='Subject: '.$this->encodedSubject((string)($m['subject']??''));
   $headers[]='Message-ID: <'.bin2hex(random_bytes(16)).'@'.$domain.'>';
   $headers[]='MIME-Version: 1.0';$headers[]='Content-Type: multipart/mixed; boundary="'.$boundary.'"';
