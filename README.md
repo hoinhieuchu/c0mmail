@@ -16,7 +16,7 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 - Rich-text compose with bold, italic, underline, lists, and links; outbound HTML is sanitized server-side, with unsafe tags, attributes, embedded media, and URL schemes removed.
 - SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, rich-text HTML alternatives with server-side allow-list sanitization, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Conversation grouping, push/IDLE sync, full-folder thread aggregation, persistent IMAP IDLE/push sync, and full folder-specific retention policies remain future work.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, rich-text HTML alternatives with server-side allow-list sanitization, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Current-page RFC conversation grouping is implemented; full-folder thread aggregation and persistent IMAP IDLE/push synchronization remain future work.
 
 ## Requirements
 
