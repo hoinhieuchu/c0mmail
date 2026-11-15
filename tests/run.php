@@ -90,4 +90,23 @@ test('IMAP message retrieval enforces the 40 MB size boundary',function(){
   catch(RuntimeException $e){same(true,str_contains($e->getMessage(),'40 MB'));}
  }
 });
+
+test('SMTP explicit 4xx and 5xx replies are definitive rejections',function(){
+ $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
+ if($pair===false)throw new RuntimeException('Unable to create SMTP protocol test socket pair');
+ fwrite($pair[1],"550 5.7.1 rejected\\r\\n");
+ $method=new ReflectionMethod(\\App\\Services\\SmtpClient::class,'expect');
+ try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP protocol rejection');}
+ catch(\\App\\Services\\SmtpProtocolException $e){same(550,$e->responseCode);same(true,$e->isNegativeReply());}
+ finally{fclose($pair[0]);fclose($pair[1]);}
+});
+test('SMTP unexpected non-negative replies remain ambiguous after DATA',function(){
+ $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
+ if($pair===false)throw new RuntimeException('Unable to create SMTP protocol test socket pair');
+ fwrite($pair[1],"354 unexpected intermediate reply\\r\\n");
+ $method=new ReflectionMethod(\\App\\Services\\SmtpClient::class,'expect');
+ try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP protocol rejection');}
+ catch(\\App\\Services\\SmtpProtocolException $e){same(354,$e->responseCode);same(false,$e->isNegativeReply());}
+ finally{fclose($pair[0]);fclose($pair[1]);}
+});
 echo "{$count} tests passed.\n";
