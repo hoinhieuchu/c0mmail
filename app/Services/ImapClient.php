@@ -25,6 +25,18 @@ final class ImapClient
         return 'UNDELETED TEXT "' . $query . '"';
     }
 
+    public static function normalizeSearchResult($result, array $errors = []): array
+    {
+        if ($result === false) {
+            if ($errors !== []) {
+                throw new \RuntimeException('IMAP search failed: ' . implode('; ', array_map('strval', $errors)));
+            }
+            return [];
+        }
+        if (!is_array($result)) throw new \RuntimeException('IMAP search returned an invalid response.');
+        return array_values(array_map('intval', $result));
+    }
+
     public static function validateFolderName(string $folder): string
     {
         if ($folder === '' || preg_match('/[\x00-\x1F\x7F{}]/', $folder)) {
@@ -94,8 +106,9 @@ final class ImapClient
             $limit = max(1, min(101, $limit));
             $criteria = self::buildUidSearchCriteria($query, $beforeUid, $afterUid);
             if ($beforeUid !== null && $beforeUid < 2) return [];
+            imap_errors();
             $uids = imap_search($stream, $criteria, SE_UID, 'UTF-8');
-            if ($uids === false) return [];
+            $uids = self::normalizeSearchResult($uids, imap_errors() ?: []);
             if ($afterUid !== null) {
                 sort($uids, SORT_NUMERIC);
                 $uids = array_slice($uids, 0, $limit);
@@ -105,7 +118,12 @@ final class ImapClient
                 $uids = array_slice($uids, $offset, $limit);
             }
             if (!$uids) return [];
+            imap_errors();
             $overview = imap_fetch_overview($stream, implode(',', $uids), FT_UID);
+            $overviewErrors = imap_errors() ?: [];
+            if ($overview === false && $overviewErrors !== []) {
+                throw new \RuntimeException('IMAP message summary retrieval failed: ' . implode('; ', array_map('strval', $overviewErrors)));
+            }
             $byUid = [];
             foreach ($overview ?: [] as $item) {
                 $uid = (int)($item->uid ?? 0);
@@ -134,7 +152,12 @@ final class ImapClient
         if ($uid < 1) throw new \InvalidArgumentException('Invalid message identifier.');
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, 0);
         try {
+            imap_errors();
             $overview = imap_fetch_overview($stream, (string)$uid, FT_UID);
+            $overviewErrors = imap_errors() ?: [];
+            if ($overview === false && $overviewErrors !== []) {
+                throw new \RuntimeException('IMAP message lookup failed: ' . implode('; ', array_map('strval', $overviewErrors)));
+            }
             if (!$overview) throw new \RuntimeException('Message not found.');
             $item = $overview[0];
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
