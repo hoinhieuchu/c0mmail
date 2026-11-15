@@ -41,4 +41,4 @@ Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_
 
 ## Deliberate exclusions
 
-The application does not run an MTA/IMAP daemon. Current webmail supports plain-text/HTML composition and inbound/outbound MIME attachments; server-side full-text indexing beyond IMAP TEXT search, rich-text editing, conversation grouping, push/IDLE sync, password-reset email, billing, domain verification, and OIDC remain future work. CraneMail's actual IMAP/SMTP endpoints and authentication policies must be verified in the target environment before production use.
+The application does not run an MTA/IMAP daemon. Current webmail supports plain-text/HTML composition and inbound/outbound MIME attachments; server-side full-text indexing beyond IMAP TEXT search, rich-text editing, full-folder thread aggregation (current-page RFC conversation grouping is implemented), push/IDLE sync, password-reset email, billing, domain verification, and OIDC remain future work. CraneMail's actual IMAP/SMTP endpoints and authentication policies must be verified in the target environment before production use.
