@@ -1,45 +1,46 @@
-# Architecture
+# c0m.me Mail
 
-## Layers
+Lightweight PHP MVC mail-account management application for cPanel/shared hosting. MariaDB/MySQL via PDO; vanilla JavaScript and CSS.
 
-- `public/index.php`: front controller and route registration.
-- `app/Core`: configuration, PDO connection, router, view, CSRF, and authentication primitives.
-- `app/Controllers`: HTTP orchestration.
-- `app/Repositories`: parameterized SQL persistence.
-- `app/Services`: mailbox lifecycle, encrypted credential access, IMAP client, and SMTP transport.
-- `app/Contracts`: replaceable identity and mail-provider contracts.
-- `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
+## Implemented foundation
 
-## Identity adapter
+- Local account authentication, role-based admin access, CSRF protection, and session ID rotation. Login attempts are throttled persistently by account and IP.
+- Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
+- Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
+- Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
+- Conversation grouping uses RFC Message-ID/References/In-Reply-To relationships for the current 50-message page; opening a thread exposes its related messages from that page. It does not merge by subject alone.
+- Webmail checks the selected IMAP folder for new messages every 90 seconds while the page is visible; the check is session-throttled and offers a manual refresh without interrupting an in-progress composition. This is polling, not IMAP IDLE push.
+- Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read/unread and star flags, server-side text search, 50-message pagination, downloading attachments, and moving messages to Trash/Spam folders when available.
+- SMTP sending with authenticated SSL/STARTTLS transport, To/Cc/Bcc delivery (Bcc is never exposed in message headers), mailbox display-name encoding, optional validated Reply-To, plain-text and HTML alternatives, and multiple MIME attachments; sent messages are copied to the server's Sent folder when that folder is exposed. Durable database-backed send-attempt records prevent duplicate submissions across sessions and PHP workers; uncertain outcomes after DATA are blocked rather than automatically retried; failures known to occur before DATA are recorded as failed and may be safely retried with the same token. Explicit SMTP 4xx/5xx rejection replies after DATA are also definitive; a missing final reply remains uncertain.
+- Draft saving to the server's Drafts folder when available.
+- Rich-text compose with bold, italic, underline, lists, and links; outbound HTML is sanitized server-side, with unsafe tags, attributes, embedded media, and URL schemes removed.
+- SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-Controllers obtain the current principal through `MemberProviderInterface`. The shipped `LocalSessionMemberProvider` reads the authenticated local account from the database. A future OIDC implementation should validate issuer, audience, signature, state, nonce, and PKCE, then map the verified subject to a local member. No Account Center endpoints or SSO assumptions are embedded.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, rich-text HTML alternatives with server-side allow-list sanitization, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Conversation grouping, push/IDLE sync, full-folder thread aggregation, persistent IMAP IDLE/push sync, and full folder-specific retention policies remain future work.
 
-## Mail-provider contract
+## Requirements
 
-`MailProviderInterface` exposes `provision`, `suspend`, `delete`, and `connectionSettings`. The connection settings method returns SMTP/IMAP host, port, and encryption mode without exposing passwords.
+PHP 8.2+, PDO MySQL, OpenSSL, DOM/XML, JSON, sessions, fileinfo, and the PHP IMAP extension (`ext-imap`) for browser webmail and attachment uploads. PHP 8.3+ is recommended for a longer supported security lifecycle. MariaDB 10.5+ or MySQL 8+. cURL is optional.
 
-Manual mode returns `manual_pending` and makes no external API call. An administrator must create the mailbox at CraneMail, then confirm activation in the admin screen. Manual suspension is recorded only after the operator confirms that they already suspended the mailbox in CraneMail. The app does not claim to have changed the remote mailbox in manual mode.
+## Quick start
 
-The CraneMail adapter sends JSON over HTTPS with bearer authentication. No verified CraneMail API specification or credentials were supplied during implementation, so the adapter uses configurable endpoint paths and a clearly documented provisional JSON contract:
-- Provision: POST configured `CRANEMAIL_PROVISION_PATH`, JSON request includes `email`, `password`, `display_name`; response must include a non-empty `id`.
-- Suspend: POST configured `CRANEMAIL_SUSPEND_PATH` with `{id}` replaced by the URL-encoded provider ID.
-- Delete: DELETE configured `CRANEMAIL_DELETE_PATH` with the same placeholder replacement.
+1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`, `database/migrations/003_send_attempt_failed_state.sql`, and `database/migrations/004_login_rate_limits.sql`.
+3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
+4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
+5. Visit `APP_URL` and sign in.
 
-This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are read from environment configuration; they are not inferred from unverified API responses.
+## Provider modes
 
-## Mailbox secrets
+- `MAIL_PROVIDER=manual`: safe default. Create the mailbox in CraneMail first, then register it in the admin screen. The application marks it `manual_pending`; confirm activation only after the mailbox exists at CraneMail. Manual suspension likewise requires confirmation after suspension in the provider control panel.
+- `MAIL_PROVIDER=cranemail`: enables the HTTP adapter. Configure API base URL, bearer token, and endpoint paths. The adapter contract is described in [architecture](docs/architecture.md). No API credentials are committed. Verify the contract against CraneMail's actual documentation/sandbox before enabling this mode.
 
-Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_KEY`; only ciphertext, nonce, and tag are stored. The initial password is shown once to the administrator after creation for secure handoff. The application does not offer a later password reveal.
+## Tests
 
-## Webmail transport
+Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/database-send-attempts.php` applies all four migrations and exercises durable send-attempt persistence plus account/IP login throttling against a MariaDB database (set `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`). `php tests/integration-mail.php` exercises IMAPS and SMTPS against GreenMail on ports 3993 and 3465, plus SMTP STARTTLS against the dedicated Python TLS-upgrade fixture in `tests/fixtures/starttls_smtp_server.py` (default port 3587). The fixture captures the accepted test message and validates SMTP AUTH. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5, runs the database idempotency integration suite against MariaDB, and its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs all protocol integration checks. GreenMail itself does not implement SMTP STARTTLS (upstream issue: https://github.com/greenmail-mail-test/greenmail/issues/135).
 
-- Webmail performs a lightweight authenticated IMAP polling check every 90 seconds while visible, scoped to the selected folder's UIDVALIDITY and latest UID. The endpoint is session-throttled and never forces a page reload, preserving unsent compose content. This is not a persistent IMAP IDLE connection.
-- `ImapClient` uses PHP's IMAP extension and the configured IMAP host, port, and encryption mode. It discovers server folders, lists messages by UID with server-side TEXT search and UID-cursor pagination scoped to UIDVALIDITY, reads text/plain (or text/html fallback) bodies, marks opened messages as seen, supports explicit read/unread and flagged/star states, appends Sent/Drafts messages, and moves messages by UID.
-- `SmtpClient` uses authenticated SMTP over implicit TLS or STARTTLS. `MimeMessageBuilder` constructs RFC 5322 multipart messages with UTF-8 plain text, optional HTML alternatives, base64 attachments, and validated In-Reply-To/References headers. The exact generated message is reused for SMTP delivery and the Sent IMAP copy; Drafts use the same builder.
-- Mailbox credentials are decrypted only after the authenticated user is verified as the mailbox owner and the mailbox is active. Credentials are never returned to templates or browser JavaScript.
-- IMAP certificate verification remains enabled. Configure valid certificates on the mail server; do not disable peer verification to work around certificate errors.
-- Folder names are discovered from the IMAP server. Draft and Sent operations are enabled only when matching server folders exist. Trash/Spam moves require those folders to exist.
+## Security and limitations
 
-## Deliberate exclusions
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, password-reset email, or full-folder conversation aggregation. Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
-The application does not run an MTA/IMAP daemon. Current webmail supports plain-text/HTML composition and inbound/outbound MIME attachments; server-side full-text indexing beyond IMAP TEXT search, rich-text editing, full-folder thread aggregation (current-page RFC conversation grouping is implemented), push/IDLE sync, password-reset email, billing, domain verification, and OIDC remain future work. CraneMail's actual IMAP/SMTP endpoints and authentication policies must be verified in the target environment before production use.
+See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
