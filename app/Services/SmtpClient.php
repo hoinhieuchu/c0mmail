@@ -12,6 +12,8 @@ final class SmtpClient
         $mode = strtolower((string)($settings['smtp_encryption'] ?? 'starttls'));
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('SMTP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid SMTP port.');
+        if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
+        if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
         if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
         foreach ($recipients as $recipient) {
             if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
