@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 require dirname(__DIR__) . '/app/bootstrap.php';
 
-use App\\Repositories\\SendAttemptRepository;
+use App\Repositories\SendAttemptRepository;
 
 $host = getenv('DB_HOST') ?: '127.0.0.1';
 $database = getenv('DB_DATABASE') ?: 'c0mmail_test';
