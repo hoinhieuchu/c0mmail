@@ -136,9 +136,24 @@ final class WebmailController
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
             $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'sending','mailbox_id'=>$mailboxId];
+            // Persist the in-flight state before network I/O. PHP normally writes
+            // session data only when the request ends; without this close, a worker
+            // crash after SMTP acceptance could leave the old "pending" token and
+            // allow a duplicate POST to send the same message again.
+            if (session_status() === PHP_SESSION_ACTIVE && !session_write_close()) {
+                throw new \RuntimeException('Unable to persist the send attempt state.');
+            }
             $messageId = '<' . $submissionId . '@c0m.me>';
             $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId);
-            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>'INBOX','sent_copy'=>'unavailable'];
+            // Persist acceptance before attempting the optional Sent-folder APPEND.
+            // If APPEND or the worker fails, a retry must not send the email again.
+            if (session_status() !== PHP_SESSION_ACTIVE && !session_start()) {
+                throw new \RuntimeException('Unable to resume the send attempt session.');
+            }
+            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>'INBOX','sent_copy'=>'pending'];
+            if (!session_write_close()) {
+                throw new \RuntimeException('Unable to persist SMTP acceptance state.');
+            }
             $sentFolder = null;
             $sentCopy = 'unavailable';
             try {
@@ -151,10 +166,14 @@ final class WebmailController
                 $sentCopy = 'failed';
                 error_log('Sent-folder copy failed after SMTP accepted message.');
             }
+            if (session_status() !== PHP_SESSION_ACTIVE && !session_start()) {
+                throw new \RuntimeException('Unable to resume the send attempt session.');
+            }
             $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>$sentFolder ?? 'INBOX','sent_copy'=>$sentCopy];
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
             exit;
         } catch (\Throwable $e) {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
             $submissionId = (string)($_POST['submission_id'] ?? '');
             if (preg_match('/^[a-f0-9]{32}$/', $submissionId) && isset($_SESSION['webmail_submissions'][$submissionId])
                 && ($_SESSION['webmail_submissions'][$submissionId]['status'] ?? '') === 'sending') {
