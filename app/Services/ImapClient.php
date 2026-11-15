@@ -206,12 +206,19 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
+    public static function validateAttachmentReference(int $uid, string $section, int $encoding): void
+    {
+        if ($uid < 1 || strlen($section) > 64
+            || !preg_match('/^[1-9][0-9]{0,4}(?:\\.[1-9][0-9]{0,4}){0,19}$/', $section)
+            || !in_array($encoding, [0, 1, 2, 3, 4, 5], true)) {
+            throw new \InvalidArgumentException('Invalid attachment reference.');
+        }
+    }
+
     public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
     {
         $this->requireExtension();
-        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section)) {
-            throw new \InvalidArgumentException('Invalid attachment reference.');
-        }
+        self::validateAttachmentReference($uid, $section, $encoding);
         self::validateFolderName($folder);
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
