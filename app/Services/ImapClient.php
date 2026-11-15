@@ -146,8 +146,10 @@ final class ImapClient
         if (!$structure) return (string)imap_body($stream, $uid, FT_UID | FT_PEEK);
         $parts = [];
         $this->collectParts($stream, $uid, $structure, '', $parts);
-        foreach (['plain', 'html'] as $wanted) {
-            foreach ($parts as $part) if ($part['type'] === $wanted) return $part['body'];
+        foreach ($parts as $part) if ($part['type'] === 'plain') return $part['body'];
+        foreach ($parts as $part) if ($part['type'] === 'html') {
+            $text = preg_replace('/<(br|\\/p|\\/div|\\/li|\\/tr)\\b[^>]*>/i', "\\n", $part['body']);
+            return html_entity_decode(strip_tags((string)$text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
         return '';
     }
