@@ -77,8 +77,8 @@ test('MIME builder rejects invalid Reply-To and sender display-name injection',f
  }
 });
 test('SMTP delivery exception exposes whether remote acceptance is uncertain',function(){
- $safe=new \\App\\Services\\SmtpDeliveryException('safe failure',false);
- $uncertain=new \\App\\Services\\SmtpDeliveryException('ambiguous DATA result',true);
+ $safe=new \App\Services\SmtpDeliveryException('safe failure',false);
+ $uncertain=new \App\Services\SmtpDeliveryException('ambiguous DATA result',true);
  same(false,$safe->deliveryUncertain);
  same(true,$uncertain->deliveryUncertain);
 });
