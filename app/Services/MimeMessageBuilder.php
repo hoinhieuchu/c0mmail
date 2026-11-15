@@ -5,7 +5,7 @@ namespace App\Services;
 /** Builds RFC 5322/MIME messages shared by SMTP delivery and IMAP Sent/Drafts copies. */
 final class MimeMessageBuilder
 {
-    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = []): string
+    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = []): string
     {
         self::assertHeader($from);
         self::assertHeader($subject, true);
@@ -34,6 +34,14 @@ final class MimeMessageBuilder
             'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
             'MIME-Version: 1.0',
         ];
+        foreach (['in_reply_to' => 'In-Reply-To', 'references' => 'References'] as $key => $headerName) {
+            $value = trim((string)($threadHeaders[$key] ?? ''));
+            if ($value !== '') {
+                self::assertHeader($value);
+                if (strlen($value) > 998) throw new \\InvalidArgumentException('Thread header exceeds the allowed length.');
+                $headers[] = $headerName . ': ' . $value;
+            }
+        }
         $hasHtml = $htmlBody !== null && trim($htmlBody) !== '';
         if ($attachments) {
             $mixed = 'mixed_' . bin2hex(random_bytes(12));
