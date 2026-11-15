@@ -22,14 +22,17 @@ final class MimeMessageBuilder
             $mime = (string)($attachment['mime'] ?? '');
             $data = (string)($attachment['data'] ?? '');
             self::assertHeader($filename);
+            if (strlen($filename) > 255) throw new \\InvalidArgumentException('Attachment filename is too long.');
             if ($filename === '' || !preg_match('#^[a-z0-9.+-]+/[a-z0-9.+-]+$#i', $mime)) throw new \InvalidArgumentException('Invalid attachment metadata.');
             $totalBytes += strlen($data);
             if ($totalBytes > 25_000_000) throw new \InvalidArgumentException('Total attachment size exceeds 25 MB.');
         }
+        $toHeader = implode(', ', array_unique($recipients));
+        if (strlen($toHeader) > 900) throw new \\InvalidArgumentException('Recipient header exceeds the allowed length.');
         $headers = [
             'Date: ' . date(DATE_RFC2822),
             'From: ' . $from,
-            'To: ' . implode(', ', array_unique($recipients)),
+            'To: ' . $toHeader,
             'Subject: ' . self::encodeHeader($subject),
             'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
             'MIME-Version: 1.0',
