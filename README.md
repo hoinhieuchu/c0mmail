@@ -22,7 +22,7 @@ PHP 8.2+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extensi
 ## Quick start
 
 1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
-2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql` and `database/migrations/003_send_attempt_failed_state.sql`.
 3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
 4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
 5. Visit `APP_URL` and sign in.
