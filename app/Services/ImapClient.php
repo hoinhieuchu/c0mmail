@@ -99,6 +99,7 @@ final class ImapClient
 
     public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50, int $offset = 0, ?string $query = null, ?int $beforeUid = null, ?int $afterUid = null): array
     {
+        if ($beforeUid !== null && $afterUid !== null) throw new \\InvalidArgumentException('Only one IMAP pagination cursor may be used.');
         if ($beforeUid !== null && $beforeUid < 2) return [];
         $this->requireExtension();
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
