@@ -26,15 +26,23 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50): array
+    public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50, int $offset = 0, ?string $query = null): array
     {
         $this->requireExtension();
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
-            $uids = imap_search($stream, 'ALL', SE_UID);
+            if ($offset < 0) throw new \\InvalidArgumentException('Invalid message offset.');
+            $limit = max(1, min(101, $limit));
+            $criteria = 'ALL';
+            if ($query !== null && trim($query) !== '') {
+                $query = trim($query);
+                if (strlen($query) > 200 || preg_match('/[\\\\x00-\\\\x1F\\\\x7F]/', $query)) throw new \\InvalidArgumentException('Search query contains unsupported characters.');
+                $criteria = 'TEXT "' . addcslashes($query, "\\\\\"") . '"';
+            }
+            $uids = imap_search($stream, $criteria, SE_UID);
             if ($uids === false) return [];
             rsort($uids, SORT_NUMERIC);
-            $uids = array_slice($uids, 0, max(1, min(100, $limit)));
+            $uids = array_slice($uids, $offset, $limit);
             if (!$uids) return [];
             $overview = imap_fetch_overview($stream, implode(',', $uids), FT_UID);
             $byUid = [];
