@@ -172,4 +172,15 @@ test('client IP resolver supports trusted IPv6 proxies and rejects invalid CIDRs
  same('2001:db8::20',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'2001:db8::10','HTTP_X_REAL_IP'=>'2001:db8::20'],['2001:db8::/32']));
  same('2001:db8::10',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'2001:db8::10','HTTP_X_REAL_IP'=>'2001:db8::20'],['not-a-cidr']));
 });
+
+test('IMAP attachment reference validator accepts bounded references',function(){
+ same(null,\App\Services\ImapClient::validateAttachmentReference(12,'1.2.3',3));
+ same(null,\App\Services\ImapClient::validateAttachmentReference(1,'2',0));
+});
+test('IMAP attachment reference validator rejects invalid UID, section, and encoding',function(){
+ foreach([[0,'1',3],[1,'1.2x',3],[1,str_repeat('1.',30).'1',3],[1,'1',99]] as [$uid,$section,$encoding]){
+  try{\App\Services\ImapClient::validateAttachmentReference($uid,$section,$encoding);throw new RuntimeException('Expected invalid attachment reference');}
+  catch(InvalidArgumentException $e){same('Invalid attachment reference.',$e->getMessage());}
+ }
+});
 echo "{$count} tests passed.\n";
