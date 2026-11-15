@@ -122,6 +122,10 @@ final class WebmailController
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $replyTo = trim((string)($_POST['reply_to'] ?? ''));
+            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \\InvalidArgumentException('Invalid Reply-To address.');
+            $replyTo = $replyTo !== '' ? $replyTo : null;
+            $fromName = (string)($context['mailbox']['display_name'] ?? '');
             $attachments = $this->uploadedAttachments();
             if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
@@ -131,7 +135,7 @@ final class WebmailController
             // Reusing a form token with altered content is rejected, not treated as a retry.
             $payloadHash = hash('sha256', serialize([
                 'from'=>$context['mailbox']['email'],'to'=>$recipients,'cc'=>$ccRecipients,'bcc'=>$bccRecipients,
-                'subject'=>$subject,'body'=>$body,'html_body'=>$htmlBody,'attachments'=>$attachments,'thread'=>$threadHeaders,
+                'subject'=>$subject,'body'=>$body,'html_body'=>$htmlBody,'attachments'=>$attachments,'thread'=>$threadHeaders,'from_name'=>$fromName,'reply_to'=>$replyTo,
             ]));
             $messageId = '<' . $submissionId . '@c0m.me>';
             $attempt = $this->sendAttempts->claim($submissionId, (int)$user['id'], $mailboxId, $payloadHash, $messageId);
@@ -158,7 +162,7 @@ final class WebmailController
             $rawMessage = $this->smtp->send(
                 $context['settings'], $context['credentials'], $context['mailbox']['email'],
                 $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders,
-                $messageId, $ccRecipients, $bccRecipients
+                $messageId, $ccRecipients, $bccRecipients, $fromName, $replyTo
             );
 
             // Persist SMTP acceptance before the optional IMAP Sent APPEND.
