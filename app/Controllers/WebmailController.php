@@ -176,6 +176,28 @@ final class WebmailController
         return null;
     }
 
+
+    public function flag(): void
+    {
+        $user = $this->auth->requireLogin();
+        Csrf::verify();
+        try {
+            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $uid = (int)($_POST['uid'] ?? 0);
+            $folder = (string)($_POST['folder'] ?? 'INBOX');
+            $flag = (string)($_POST['flag'] ?? '');
+            $enabled = (string)($_POST['enabled'] ?? '1') === '1';
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
+            $this->imap->setFlag($context['settings'], $context['credentials'], $folder, $uid, $flag, $enabled);
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&flagged=1');
+            exit;
+        } catch (\Throwable $e) {
+            $this->indexWithError($user, $e->getMessage());
+        }
+    }
+
     public function move(): void
     {
         $user = $this->auth->requireLogin();
