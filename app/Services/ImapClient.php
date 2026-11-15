@@ -105,7 +105,7 @@ final class ImapClient
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('IMAP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid IMAP port.');
         $flags = $encryption === 'ssl' ? '/imap/ssl' : ($encryption === 'starttls' ? '/imap/tls' : '/imap');
-        return '{' . $host . ':' . $port . $flags . '/novalidate-cert}';
+        return '{' . $host . ':' . $port . $flags . '}';
     }
 
     private function encodeFolder(string $folder): string
