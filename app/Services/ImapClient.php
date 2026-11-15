@@ -98,7 +98,7 @@ final class ImapClient
                 'Content-Type: text/plain; charset=UTF-8',
                 'Content-Transfer-Encoding: quoted-printable',
             ];
-            $raw = implode("\\r\\n", $headers) . "\\r\\n\\r\\n" . quoted_printable_encode(str_replace(["\\r\\n", "\\r"], "\\n", $body)) . "\\r\\n";
+            $raw = implode("\r\n", $headers) . "\r\n\r\n" . quoted_printable_encode(str_replace(["\r\n", "\r"], "\n", $body)) . "\r\n";
             $target = $this->prefix($settings) . $this->encodeFolder($folder);
             if (!imap_append($stream, $target, $raw, $flag)) throw new \RuntimeException('Unable to save message to IMAP folder: ' . $this->lastError());
         } finally { imap_close($stream); }
