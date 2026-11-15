@@ -194,7 +194,7 @@ final class WebmailController
                     } else {
                         $this->sendAttempts->markFailed($submissionId, (int)$user['id'], $mailboxId);
                     }
-                } catch (\\Throwable $stateError) {
+                } catch (\Throwable $stateError) {
                     error_log('Unable to persist mail-send failure state: ' . get_class($stateError));
                 }
             }
