@@ -46,10 +46,29 @@ final class WebmailController
             $selected = null;
             $uid = (int)($_GET['uid'] ?? 0);
             if ($uid > 0) $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+            $compose = ['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''];
+            $composeMode = (string)($_GET['compose'] ?? '');
+            if ($selected && in_array($composeMode, ['reply', 'forward'], true)) {
+                $subject = (string)$selected['subject'];
+                $compose['subject'] = (stripos($subject, $composeMode === 'reply' ? 'Re:' : 'Fwd:') === 0 ? $subject : ($composeMode === 'reply' ? 'Re: ' : 'Fwd: ') . $subject);
+                if ($composeMode === 'reply') {
+                    $from = (string)$selected['from'];
+                    if (preg_match('/<([^<>]+)>/', $from, $match)) $from = $match[1];
+                    if (filter_var(trim($from), FILTER_VALIDATE_EMAIL)) $compose['to'] = trim($from);
+                    $quoted = preg_split('/\\r\\n|\\r|\\n/', (string)$selected['body']) ?: [];
+                    $quoted = implode("\\n", array_map(static fn(string $line): string => '> ' . $line, $quoted));
+                    $compose['body'] = "\\n\\nOn " . $selected['date'] . ', ' . $selected['from'] . " wrote:\\n" . $quoted;
+                    $compose['in_reply_to'] = (string)($selected['message_id'] ?? '');
+                    $references = trim((string)($selected['references'] ?? '') . ' ' . (string)($selected['message_id'] ?? ''));
+                    $compose['references'] = strlen($references) > 998 ? substr($references, -998) : $references;
+                } else {
+                    $compose['body'] = "---------- Forwarded message ----------\\nFrom: " . $selected['from'] . "\\nDate: " . $selected['date'] . "\\nSubject: " . $selected['subject'] . "\\nTo: " . $selected['to'] . "\\n\\n" . $selected['body'];
+                }
+            }
             $this->render([
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
-                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
+                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
             $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$e->getMessage()]);
@@ -213,6 +232,6 @@ final class WebmailController
 
     private function render(array $data): void
     {
-        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false], $data));
+        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false,'compose'=>['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>'']], $data));
     }
 }
