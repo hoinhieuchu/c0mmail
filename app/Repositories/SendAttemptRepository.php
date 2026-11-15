@@ -15,7 +15,7 @@ final class SendAttemptRepository
         if (!preg_match('/^[a-f0-9]{32}$/', $submissionId) || $userId < 1 || $mailboxId < 1) {
             throw new InvalidArgumentException('Invalid send-attempt identity.');
         }
-        $this->db->exec("DELETE FROM mail_send_attempts WHERE created_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY)");
+        $this->db->exec("DELETE FROM mail_send_attempts WHERE created_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY) OR (status='pending' AND created_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 1 DAY))");
         $stmt = $this->db->prepare(
             "INSERT INTO mail_send_attempts (submission_id, user_id, mailbox_id, status) VALUES (?, ?, ?, 'pending')"
         );
