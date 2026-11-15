@@ -9,6 +9,17 @@ final class ImapClient
 {
     public function available(): bool { return function_exists('imap_open'); }
 
+
+    public static function buildSearchCriteria(?string $query): string
+    {
+        $query = trim((string)$query);
+        if ($query === '') return 'ALL';
+        if (strlen($query) > 200 || preg_match('/[\\x00-\\x1F\\x7F]/', $query)) {
+            throw new \\InvalidArgumentException('Search query contains unsupported characters.');
+        }
+        return 'TEXT "' . addcslashes($query, "\\\\"") . '"';
+    }
+
     public function folders(array $settings, array $credentials): array
     {
         $this->requireExtension();
