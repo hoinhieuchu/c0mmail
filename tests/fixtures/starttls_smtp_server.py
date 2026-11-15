@@ -56,6 +56,8 @@ def main() -> None:
                         if args.drop_after_data:
                             self.rfile.close()
                             self.wfile.close()
+                            self.rfile = None
+                            self.wfile = None
                             self.connection.close()
                             return
                         self.reply(args.final_data_reply)
