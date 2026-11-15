@@ -78,6 +78,29 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
+
+    public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag): void
+    {
+        $this->requireExtension();
+        if (!in_array($flag, ['\\\\Seen', '\\\\Draft'], true)) throw new \\InvalidArgumentException('Unsupported IMAP message flag.');
+        $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
+        try {
+            $headers = [
+                'Date: ' . date(DATE_RFC2822),
+                'From: ' . $from,
+                'To: ' . implode(', ', $recipients),
+                'Subject: ' . (function_exists('mb_encode_mimeheader') ? mb_encode_mimeheader($subject, 'UTF-8', 'B') : '=?UTF-8?B?' . base64_encode($subject) . '?='),
+                'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
+                'MIME-Version: 1.0',
+                'Content-Type: text/plain; charset=UTF-8',
+                'Content-Transfer-Encoding: quoted-printable',
+            ];
+            $raw = implode("\\r\\n", $headers) . "\\r\\n\\r\\n" . quoted_printable_encode(str_replace(["\\r\\n", "\\r"], "\\n", $body)) . "\\r\\n";
+            $target = $this->prefix($settings) . $this->encodeFolder($folder);
+            if (!imap_append($stream, $target, $raw, $flag)) throw new \\RuntimeException('Unable to save message to IMAP folder: ' . $this->lastError());
+        } finally { imap_close($stream); }
+    }
+
     public function move(array $settings, array $credentials, string $source, int $uid, string $destination): void
     {
         $this->requireExtension();
