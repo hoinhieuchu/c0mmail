@@ -68,7 +68,7 @@ final class WebmailController
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
                 if ($sentFolder !== null) $this->imap->appendTextMessage($context['settings'], $context['credentials'], $sentFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Seen');
-            } catch (\\Throwable $saveError) { error_log('Sent-folder copy failed after SMTP accepted message: ' . $saveError->getMessage()); }
+            } catch (\${name} $saveError) { error_log('Sent-folder copy failed after SMTP accepted message: ' . $saveError->getMessage()); }
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1');
             exit;
         } catch (\Throwable $e) {
@@ -88,13 +88,13 @@ final class WebmailController
             $recipients = array_values(array_unique(array_filter(array_map('trim', $to), static fn(string $v): bool => filter_var($v, FILTER_VALIDATE_EMAIL) !== false)));
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
-            if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \\InvalidArgumentException('Draft exceeds the allowed size.');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \${name}('Draft exceeds the allowed size.');
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
-            if ($draftFolder === null) throw new \\RuntimeException('The IMAP server does not expose a Drafts folder.');
+            if ($draftFolder === null) throw new \${name}('The IMAP server does not expose a Drafts folder.');
             $this->imap->appendTextMessage($context['settings'], $context['credentials'], $draftFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
-        } catch (\\Throwable $e) { $this->indexWithError($user, $e->getMessage()); }
+        } catch (\${name} $e) { $this->indexWithError($user, $e->getMessage()); }
     }
 
     private function findFolder(array $folders, array $candidates): ?string
