@@ -62,3 +62,5 @@
 - Login IP throttling is proxy-safe: `ClientIpResolver` trusts `REMOTE_ADDR` unless it belongs to an explicitly configured `APP_TRUSTED_PROXY_CIDRS` CIDR. Only then does it accept `CF-Connecting-IP` or `X-Real-IP`; it never trusts `X-Forwarded-For`. IPv4 and IPv6 CIDR matching are unit-tested. Configure Cloudflare/reverse-proxy CIDRs at deployment or leave the variable empty for direct-origin traffic.
 
 - SMTP phase classification now has end-to-end STARTTLS fixture coverage: one fixture returns an explicit 550 after receiving the final DATA terminator and must produce `deliveryUncertain=false`; another drops the socket after receiving DATA without a final reply and must produce `deliveryUncertain=true`. Both checks run in the PHP 8.5 protocol integration job.
+
+- IMAP MOVE intentionally avoids `imap_expunge()`, because that function expunges every message already flagged `\\Deleted` in the source folder. The GreenMail integration test now creates an unrelated pre-deleted message, moves a different UID, and verifies the unrelated deleted UID remains on the server.
