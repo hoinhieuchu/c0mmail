@@ -8,7 +8,7 @@ namespace App\Services;
  */
 final class SubmissionState
 {
-    public const STALE_AFTER_SECONDS = 120;
+    public const STALE_AFTER_SECONDS = 900;
 
     public static function classify(array $submission, ?int $now = null): string
     {
