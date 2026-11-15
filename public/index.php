@@ -32,12 +32,12 @@ header('Cache-Control: private, no-store, max-age=0');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
     header('Strict-Transport-Security: max-age=31536000');
 }
-$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
+$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);$sendAttempts=new SendAttemptRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
-$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);$webmail=new WebmailController($auth,$mailboxes,$service,new ImapClient(),new SmtpClient(),$view);
+$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view);$webmail=new WebmailController($auth,$mailboxes,$service,new ImapClient(),new SmtpClient(),$view,$sendAttempts);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $router=new Router();
