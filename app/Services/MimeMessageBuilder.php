@@ -30,7 +30,7 @@ final class MimeMessageBuilder
         $recipients = array_values(array_unique($recipients));
         $ccRecipients = array_values(array_diff(array_unique($ccRecipients), $recipients));
         $bccRecipients = array_values(array_diff(array_unique($bccRecipients), array_merge($recipients, $ccRecipients)));
-        $toHeader = implode(', ', $recipients);
+        $toHeader = $recipients ? implode(', ', $recipients) : 'undisclosed-recipients:;';
         $ccHeader = implode(', ', $ccRecipients);
         if (strlen($toHeader) > 900 || strlen($ccHeader) > 900) throw new \InvalidArgumentException('Recipient header exceeds the allowed length.');
         $messageId ??= '<' . bin2hex(random_bytes(16)) . '@c0m.me>';
