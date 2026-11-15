@@ -16,8 +16,14 @@ final class SmtpClient
         if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
         $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
-        $socket = @stream_socket_client($target, $errno, $error, 20, STREAM_CLIENT_CONNECT);
-        if (!$socket) throw new \RuntimeException('SMTP connection failed: ' . $error . ' (' . $errno . ').');
+        $context = stream_context_create(['ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+            'peer_name' => $host,
+            'SNI_enabled' => true,
+        ]]);
+        $socket = @stream_socket_client($target, $errno, $error, 20, STREAM_CLIENT_CONNECT, $context);
+        if (!$socket) throw new \RuntimeException('SMTP connection failed. Check the configured host, port, and TLS certificate.');
         stream_set_timeout($socket, 20);
         try {
             $this->expect($socket, [220]);
@@ -39,7 +45,7 @@ final class SmtpClient
             $this->writeAll($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
             $this->expect($socket, [250]);
             try { $this->command($socket, 'QUIT', [221]); }
-            catch (\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance: ' . $quitError->getMessage()); }
+            catch (\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance.'); }
             return $message;
         } finally { fclose($socket); }
     }
@@ -65,7 +71,12 @@ final class SmtpClient
         $response = '';
         do {
             $line = fgets($socket, 515);
-            if ($line === false) throw new \RuntimeException('SMTP server closed the connection unexpectedly.');
+            if ($line === false) {
+                $meta = stream_get_meta_data($socket);
+                throw new \RuntimeException(!empty($meta['timed_out'])
+                    ? 'SMTP server response timed out.'
+                    : 'SMTP server closed the connection unexpectedly.');
+            }
             $response .= $line;
         } while (isset($line[3]) && $line[3] === '-');
         $code = (int)substr($response, 0, 3);

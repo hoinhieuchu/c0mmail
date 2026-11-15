@@ -18,11 +18,19 @@ final class ImapClient
     public static function buildSearchCriteria(?string $query): string
     {
         $query = trim((string)$query);
-        if ($query === '') return 'ALL';
+        if ($query === '') return 'UNDELETED';
         if (strlen($query) > 200 || preg_match('/[\x00-\x1F\x7F]/', $query) || str_contains($query, '"') || str_contains($query, '\\')) {
             throw new \InvalidArgumentException('Search query contains unsupported characters.');
         }
-        return 'TEXT "' . $query . '"';
+        return 'UNDELETED TEXT "' . $query . '"';
+    }
+
+    public static function validateFolderName(string $folder): string
+    {
+        if ($folder === '' || preg_match('/[\x00-\x1F\x7F{}]/', $folder)) {
+            throw new \InvalidArgumentException('Invalid IMAP folder name.');
+        }
+        return $folder;
     }
 
     public function folders(array $settings, array $credentials): array
@@ -72,7 +80,11 @@ final class ImapClient
                     'size' => (int)($item->size ?? 0),
                 ];
             }
-            return array_values(array_replace(array_fill_keys($uids, []), $byUid));
+            $ordered = [];
+            foreach ($uids as $uid) {
+                if (isset($byUid[$uid])) $ordered[] = $byUid[$uid];
+            }
+            return $ordered;
         } finally { imap_close($stream); }
     }
 
@@ -111,6 +123,7 @@ final class ImapClient
     {
         $this->requireExtension();
         if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section)) throw new \InvalidArgumentException('Invalid attachment reference.');
+        self::validateFolderName($folder);
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
             $raw = imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
@@ -130,6 +143,7 @@ final class ImapClient
     public function appendRawMessage(array $settings, array $credentials, string $folder, string $raw, string $flag): void
     {
         $this->requireExtension();
+        self::validateFolderName($folder);
         if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \InvalidArgumentException('Unsupported IMAP message flag.');
         if (strlen($raw) > 30_000_000 || !str_contains($raw, "\r\n\r\n")) throw new \InvalidArgumentException('Invalid or oversized RFC message.');
         $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
@@ -143,6 +157,7 @@ final class ImapClient
     public function setFlag(array $settings, array $credentials, string $folder, int $uid, string $flag, bool $enabled): void
     {
         $this->requireExtension();
+        self::validateFolderName($folder);
         if ($uid < 1 || !in_array($flag, ['Seen', 'Flagged'], true)) throw new \InvalidArgumentException('Unsupported message flag operation.');
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, 0);
         try {
@@ -157,12 +172,16 @@ final class ImapClient
     public function move(array $settings, array $credentials, string $source, int $uid, string $destination): void
     {
         $this->requireExtension();
+        if ($uid < 1) throw new \InvalidArgumentException('Invalid message identifier.');
+        self::validateFolderName($source);
+        self::validateFolderName($destination);
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($source), $credentials, 0);
         try {
             if (!imap_mail_move($stream, (string)$uid, $this->encodeFolder($destination), CP_UID)) {
                 throw new \RuntimeException('Unable to move message: ' . $this->lastError());
             }
-            if (!imap_expunge($stream)) throw new \RuntimeException('Unable to expunge moved message.');
+            // Avoid imap_expunge(): it expunges every message already marked
+            // Deleted in this mailbox, not just the UID moved by this operation.
         } finally { imap_close($stream); }
     }
 
@@ -187,13 +206,17 @@ final class ImapClient
 
     private function encodeFolder(string $folder): string
     {
-        if ($folder === '' || str_contains($folder, "\0")) throw new \InvalidArgumentException('Invalid folder name.');
+        self::validateFolderName($folder);
         return function_exists('imap_utf7_encode') ? imap_utf7_encode($folder) : $folder;
     }
 
     private function extractBody($stream, int $uid, $structure, array &$attachments): string
     {
-        if (!$structure) return (string)imap_body($stream, $uid, FT_UID | FT_PEEK);
+        if (!$structure) {
+            $raw = imap_body($stream, $uid, FT_UID | FT_PEEK);
+            if ($raw === false) throw new \RuntimeException('Message body could not be retrieved.');
+            return (string)$raw;
+        }
         $parts = [];
         $this->collectParts($stream, $uid, $structure, '', $parts, $attachments);
         foreach ($parts as $part) if ($part['type'] === 'plain') return $part['body'];
@@ -231,9 +254,14 @@ final class ImapClient
         $raw = $section === ''
             ? imap_body($stream, $uid, FT_UID | FT_PEEK)
             : imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
+        if ($raw === false) throw new \RuntimeException('Message body part could not be retrieved.');
         $body = (string)$raw;
         $encoding = (int)($structure->encoding ?? 0);
-        if ($encoding === 3) $body = (string)base64_decode($body, true);
+        if ($encoding === 3) {
+            $decoded = base64_decode($body, true);
+            if ($decoded === false) throw new \RuntimeException('Message body has invalid base64 encoding.');
+            $body = $decoded;
+        }
         elseif ($encoding === 4) $body = quoted_printable_decode($body);
         $charset = 'UTF-8';
         foreach (($structure->parameters ?? []) as $parameter) {
@@ -247,9 +275,19 @@ final class ImapClient
 
     private function partFilename($structure): string
     {
-        foreach (array_merge($structure->parameters ?? [], $structure->dparameters ?? []) as $parameter) {
-            if (in_array(strtolower((string)($parameter->attribute ?? '')), ['name', 'filename'], true)) {
-                return (string)($parameter->value ?? '');
+        $parameters = array_merge($structure->parameters ?? [], $structure->dparameters ?? []);
+        foreach (['filename*', 'name*', 'filename', 'name'] as $wanted) {
+            foreach ($parameters as $parameter) {
+                if (strtolower((string)($parameter->attribute ?? '')) !== $wanted) continue;
+                $value = (string)($parameter->value ?? '');
+                if (str_ends_with($wanted, '*') && preg_match("/^([^']*)'[^']*'(.*)$/", $value, $match)) {
+                    $charset = $match[1] !== '' ? $match[1] : 'UTF-8';
+                    $value = rawurldecode($match[2]);
+                    if (strtoupper($charset) !== 'UTF-8' && function_exists('mb_convert_encoding')) {
+                        $value = mb_convert_encoding($value, 'UTF-8', $charset);
+                    }
+                }
+                return $value;
             }
         }
         return '';

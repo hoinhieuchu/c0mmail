@@ -13,7 +13,7 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 - Draft saving to the server's Drafts folder when available.
 - SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Current compose support is plain text; MIME attachments, rich HTML composition, search, pagination beyond the latest 100 messages, and full folder-specific retention policies remain future work.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, optional HTML alternatives, and MIME attachments. IMAP pagination currently uses offset-based pages; stable UID cursor pagination, conversation grouping, push/IDLE sync, and full folder-specific retention policies remain future work.
 
 ## Requirements
 
@@ -38,6 +38,6 @@ Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -
 
 ## Security and limitations
 
-Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, MIME attachments, rich HTML composition, or full-text search. Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, rich-text editing, or conversation grouping. Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
 See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).

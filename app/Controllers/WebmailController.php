@@ -78,8 +78,9 @@ final class WebmailController
     public function send(): void
     {
         $user = $this->auth->requireLogin();
-        Csrf::verify();
         try {
+            $this->assertPostBodyWithinLimit();
+            Csrf::verify();
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $rawTo = (string)($_POST['to'] ?? '');
@@ -93,14 +94,23 @@ final class WebmailController
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
             $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders);
+            $sentFolder = null;
+            $sentCopy = 'unavailable';
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
-                if ($sentFolder !== null) $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
-            } catch (\Throwable $saveError) { error_log('Sent-folder copy failed after SMTP accepted message: ' . $saveError->getMessage()); }
-            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1');
+                if ($sentFolder !== null) {
+                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
+                    $sentCopy = 'saved';
+                }
+            } catch (\Throwable $saveError) {
+                $sentCopy = 'failed';
+                error_log('Sent-folder copy failed after SMTP accepted message.');
+            }
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
             exit;
         } catch (\Throwable $e) {
-            $this->indexWithError($user, $e->getMessage());
+            error_log('Webmail send failed: ' . get_class($e));
+            $this->indexWithError($user, $this->userFacingError($e));
         }
     }
 
@@ -134,7 +144,7 @@ final class WebmailController
             echo $data;
             exit;
         } catch (\Throwable $e) {
-            error_log('Webmail attachment download failed: ' . $e->getMessage());
+            error_log('Webmail attachment download failed: ' . get_class($e));
             http_response_code(404);
             exit('Attachment not found.');
         }
@@ -143,8 +153,9 @@ final class WebmailController
     public function saveDraft(): void
     {
         $user = $this->auth->requireLogin();
-        Csrf::verify();
         try {
+            $this->assertPostBodyWithinLimit();
+            Csrf::verify();
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $to = preg_split('/[,;]+/', (string)($_POST['to'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -162,7 +173,10 @@ final class WebmailController
             $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
-        } catch (\Throwable $e) { $this->indexWithError($user, $e->getMessage()); }
+        } catch (\Throwable $e) {
+            error_log('Webmail draft save failed: ' . get_class($e));
+            $this->indexWithError($user, $this->userFacingError($e));
+        }
     }
 
     private function findFolder(array $folders, array $candidates): ?string
@@ -195,7 +209,7 @@ final class WebmailController
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&flagged=1');
             exit;
         } catch (\Throwable $e) {
-            $this->indexWithError($user, $e->getMessage());
+            $this->indexWithError($user, $this->userFacingError($e));
         }
     }
 
@@ -216,7 +230,7 @@ final class WebmailController
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($source) . '&moved=1');
             exit;
         } catch (\Throwable $e) {
-            $this->indexWithError($user, $e->getMessage());
+            $this->indexWithError($user, $this->userFacingError($e));
         }
     }
 
@@ -225,6 +239,41 @@ final class WebmailController
         $this->render(['user'=>$user,'mailboxes'=>array_values(array_filter($this->mailboxes->forUser((int)$user['id']), static fn(array $m): bool => $m['status'] === 'active')),'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$error]);
     }
 
+    private function userFacingError(\Throwable $error): string
+    {
+        if ($error instanceof \InvalidArgumentException) return $error->getMessage();
+        $message = $error->getMessage();
+        if (str_contains($message, 'IMAP extension is required')) return 'Webmail requires the PHP IMAP extension. Ask the hosting provider to enable it.';
+        if (str_contains($message, 'SMTP server rejected')) return 'The SMTP server rejected the message. Check the recipients and mailbox settings.';
+        if (str_contains($message, 'SMTP server response timed out') || str_contains($message, 'SMTP server closed')) {
+            return 'The SMTP connection ended before acceptance could be confirmed. Check the Sent folder before retrying.';
+        }
+        if (str_contains($message, 'Active mailbox not found')) return 'The selected mailbox is unavailable or inactive.';
+        return 'The mail operation could not be completed. Check the mail server settings and application logs.';
+    }
+
+    private function assertPostBodyWithinLimit(): void
+    {
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $limit = $this->iniSizeBytes((string)ini_get('post_max_size'));
+        if ($limit > 0 && $contentLength > $limit && $_POST === [] && $_FILES === []) {
+            throw new \InvalidArgumentException('The upload exceeds the server request limit. Increase PHP post_max_size and try again.');
+        }
+    }
+
+    private function iniSizeBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') return 0;
+        $unit = strtolower(substr($value, -1));
+        $number = (float)$value;
+        return match ($unit) {
+            'g' => (int)($number * 1024 * 1024 * 1024),
+            'm' => (int)($number * 1024 * 1024),
+            'k' => (int)($number * 1024),
+            default => (int)$number,
+        };
+    }
 
     private function uploadedAttachments(): array
     {
@@ -238,7 +287,12 @@ final class WebmailController
         for ($i = 0; $i < $count; $i++) {
             $error = (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
             if ($error === UPLOAD_ERR_NO_FILE) continue;
-            if ($error !== UPLOAD_ERR_OK) throw new \RuntimeException('An attachment upload failed (code ' . $error . ').');
+            if ($error !== UPLOAD_ERR_OK) {
+                if (in_array($error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    throw new \InvalidArgumentException('An attachment exceeds the PHP upload_max_filesize limit.');
+                }
+                throw new \RuntimeException('An attachment upload failed.');
+            }
             $tmp = (string)($files['tmp_name'][$i] ?? '');
             if ($tmp === '' || !is_uploaded_file($tmp)) throw new \RuntimeException('Invalid attachment upload.');
             $size = (int)($files['size'][$i] ?? 0);
