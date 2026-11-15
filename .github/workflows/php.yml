@@ -15,7 +15,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php-version }}
-          extensions: pdo_mysql, openssl, imap, fileinfo
+          extensions: pdo_mysql, openssl, imap, fileinfo, dom
       - name: PHP syntax check
         run: find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: JavaScript syntax check
