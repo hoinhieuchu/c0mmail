@@ -33,7 +33,7 @@ final class AuthController
             return;
         }
 
-        $this->loginLimits->clear($email, $ip);
+        $this->loginLimits->clearAccount($email);
         session_regenerate_id(true);
         $_SESSION = [
             '_csrf' => bin2hex(random_bytes(32)),
