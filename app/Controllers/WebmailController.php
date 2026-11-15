@@ -526,6 +526,7 @@ final class WebmailController
     private function render(array $data): void
     {
         $data['compose'] = array_merge(['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $data['compose'] ?? []);
+        $data['compose']['html_body'] = HtmlEmailSanitizer::sanitize((string)$data['compose']['html_body']) ?? '';
         if (empty($data['compose']['submission_id']) && !empty($data['user']['id']) && !empty($data['activeMailbox']['id'])) {
             $token = bin2hex(random_bytes(16));
             $this->sendAttempts->createPending($token, (int)$data['user']['id'], (int)$data['activeMailbox']['id']);
