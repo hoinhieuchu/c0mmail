@@ -63,6 +63,7 @@ final class ConversationGrouper
 
     private static function messageIds(string $value): array
     {
+        $value = substr($value, 0, 8192);
         if (!preg_match_all('/<[^<>\s]+>/', $value, $matches)) return [];
         return array_values(array_unique($matches[0]));
     }
