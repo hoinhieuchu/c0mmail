@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 /**
- * Classifies session-scoped SMTP submission state without mutating the session.
+ * Classifies SMTP submission states without mutating persistent state.
  * A stale in-flight state is uncertain, never automatically retryable.
  */
 final class SubmissionState
