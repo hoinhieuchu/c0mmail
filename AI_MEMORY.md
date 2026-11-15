@@ -64,3 +64,5 @@
 - SMTP phase classification now has end-to-end STARTTLS fixture coverage: one fixture returns an explicit 550 after receiving the final DATA terminator and must produce `deliveryUncertain=false`; another drops the socket after receiving DATA without a final reply and must produce `deliveryUncertain=true`. Both checks run in the PHP 8.5 protocol integration job.
 
 - IMAP MOVE intentionally avoids `imap_expunge()`, because that function expunges every message already flagged `\\Deleted` in the source folder. The GreenMail integration test now creates an unrelated pre-deleted message, moves a different UID, and verifies the unrelated deleted UID remains on the server.
+
+- IMAP message retrieval now rejects empty overview results for UIDs returned by search, validates each overview UID against the requested set, verifies the selected UID before fetching MIME structure, surfaces structure errors, and returns `seen=true` after successfully setting the Seen flag. GreenMail integration verifies the opened-message state.
