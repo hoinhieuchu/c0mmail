@@ -39,7 +39,7 @@ final class SmtpClient
             $this->writeAll($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
             $this->expect($socket, [250]);
             try { $this->command($socket, 'QUIT', [221]); }
-            catch (\\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance: ' . $quitError->getMessage()); }
+            catch (\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance: ' . $quitError->getMessage()); }
             return $message;
         } finally { fclose($socket); }
     }
