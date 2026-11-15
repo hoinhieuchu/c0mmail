@@ -24,14 +24,22 @@ jobs:
         if: matrix.php-version == '8.5'
         run: |
           openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout /tmp/greenmail.key -out /tmp/greenmail.crt -days 1 \
-            -subj "/CN=localhost" \
-            -addext "subjectAltName=DNS:localhost" \
+            -keyout /tmp/greenmail-ca.key -out /tmp/greenmail-ca.crt -days 1 \
+            -subj "/CN=c0mmail CI Test CA" \
             -addext "basicConstraints=critical,CA:TRUE" \
-            -addext "keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign"
+            -addext "keyUsage=critical,keyCertSign,cRLSign"
+          openssl req -newkey rsa:2048 -nodes \
+            -keyout /tmp/greenmail.key -out /tmp/greenmail.csr \
+            -subj "/CN=localhost"
+          printf "subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature,keyEncipherment\nbasicConstraints=critical,CA:FALSE\n" > /tmp/greenmail.ext
+          openssl x509 -req -in /tmp/greenmail.csr -CA /tmp/greenmail-ca.crt \
+            -CAkey /tmp/greenmail-ca.key -CAcreateserial -out /tmp/greenmail.crt \
+            -days 1 -sha256 -extfile /tmp/greenmail.ext
           openssl pkcs12 -export -in /tmp/greenmail.crt -inkey /tmp/greenmail.key \
-            -out /tmp/greenmail.p12 -passout pass:changeit -name greenmail
-          sudo cp /tmp/greenmail.crt /usr/local/share/ca-certificates/greenmail-test.crt
+            -certfile /tmp/greenmail-ca.crt -out /tmp/greenmail.p12 \
+            -passout pass:changeit -name greenmail
+          chmod 644 /tmp/greenmail.p12
+          sudo cp /tmp/greenmail-ca.crt /usr/local/share/ca-certificates/greenmail-test-ca.crt
           sudo update-ca-certificates
           docker run -d --name greenmail \
             -p 3465:3465 -p 3993:3993 \
@@ -39,10 +47,10 @@ jobs:
             -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=test1:pwd1 -Dgreenmail.users.login=email -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
             greenmail/standalone:2.1.15
           ready=0
-          for attempt in $(seq 1 60); do
-            if timeout 5 openssl s_client -connect 127.0.0.1:3993 -servername localhost \
+          for attempt in $(seq 1 15); do
+            if timeout 3 openssl s_client -connect 127.0.0.1:3993 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-imaps.log 2>&1 \
-              && timeout 5 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
+              && timeout 3 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1; then
               ready=1
               break
