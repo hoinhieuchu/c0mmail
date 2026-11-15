@@ -142,7 +142,7 @@ final class WebmailController
                 exit;
             }
             if ($status === 'sending' && empty($attempt['claimed'])) {
-                throw new \\RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
+                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
             }
             if ($status !== 'sending') {
                 throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
