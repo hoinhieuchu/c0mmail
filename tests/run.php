@@ -126,19 +126,20 @@ test('login rate-limit repository autoloads',function(){same(true,class_exists(\
 test('conversation grouper follows RFC References and In-Reply-To chains',function(){
  $messages=[
   ['uid'=>10,'subject'=>'Quarterly report','from'=>'a@example.test','date'=>'2026-01-01','message_id'=>'<root@example.test>','references'=>'','in_reply_to'=>''],
-  ['uid'=>11,'subject'=>'Re: Quarterly report','from'=>'b@example.test','date'=>'2026-01-02','message_id'=>'<reply@example.test>','references'=>'','in_reply_to'=>'<root@example.test>'],
+  ['uid'=>11,'subject'=>'Re: Quarterly report','from'=>'b@example.test','date'=>'2026-01-02','message_id'=>'<reply@example.test>','references'=>'','in_reply_to'=>'<root@example.test>','seen'=>false],
   ['uid'=>12,'subject'=>'Re: Quarterly report','from'=>'c@example.test','date'=>'2026-01-03','message_id'=>'<followup@example.test>','references'=>'<root@example.test> <reply@example.test>','in_reply_to'=>'<reply@example.test>'],
   ['uid'=>20,'subject'=>'Quarterly report','from'=>'d@example.test','date'=>'2026-01-04','message_id'=>'<separate@example.test>','references'=>'','in_reply_to'=>''],
  ];
- $groups=\\App\\Services\\ConversationGrouper::group($messages);
+ $groups=\App\Services\ConversationGrouper::group($messages);
  same(2,count($groups));
  same(20,$groups[0]['uid']);
  same(12,$groups[1]['uid']);
  same(3,$groups[1]['thread_count']);
+ same(false,$groups[1]['seen']);
  same([12,11,10],$groups[1]['thread_uids']);
 });
 test('conversation grouper does not merge unrelated messages with matching subjects',function(){
- $groups=\\App\\Services\\ConversationGrouper::group([
+ $groups=\App\Services\ConversationGrouper::group([
   ['uid'=>1,'subject'=>'Hello','message_id'=>'<one@example.test>'],
   ['uid'=>2,'subject'=>'Hello','message_id'=>'<two@example.test>'],
  ]);
