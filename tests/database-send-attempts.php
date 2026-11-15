@@ -43,10 +43,10 @@ try {
     for ($i = 0; $i < 10; $i++) $loginLimits->recordFailure('blocked@example.test', '192.0.2.10');
     $check($loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'repeated password failures block the account key');
     $loginLimits->clear('blocked@example.test', '192.0.2.10');
-    $check(!$loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'successful authentication clears account and IP throttles');
+    $check(!$loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'successful authentication clears the account throttle');
 
-    for ($i = 0; $i < 30; $i++) $loginLimits->recordFailure('spray-' . $i . '@example.test', '198.51.100.10');
-    $check($loginLimits->isBlocked('spray-final@example.test', '198.51.100.10'), 'distributed account guessing from one IP trips the IP throttle');
+    for ($i = 0; $i < 20; $i++) $loginLimits->recordFailure('other-' . $i . '@example.test', '192.0.2.10');
+    $check($loginLimits->isBlocked('other-final@example.test', '192.0.2.10'), 'successful login does not erase the shared IP failure counter');
 
     $token = bin2hex(random_bytes(16));
     $hash = hash('sha256', 'stable payload');
