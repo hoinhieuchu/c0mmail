@@ -36,14 +36,19 @@ final class WebmailController
             $folderNames = array_column($folders, 'name');
             $folder = (string)($_GET['folder'] ?? 'INBOX');
             if (!in_array($folder, $folderNames, true)) $folder = in_array('INBOX', $folderNames, true) ? 'INBOX' : ($folderNames[0] ?? 'INBOX');
-            $messages = $this->imap->listMessages($context['settings'], $context['credentials'], $folder, 50);
+            $page = max(1, min(1000, (int)($_GET['page'] ?? 1)));
+            $query = trim((string)($_GET['q'] ?? ''));
+            if (strlen($query) > 200) throw new \\InvalidArgumentException('Search query is too long.');
+            $messages = $this->imap->listMessages($context['settings'], $context['credentials'], $folder, 51, ($page - 1) * 50, $query !== '' ? $query : null);
+            $hasMore = count($messages) > 50;
+            $messages = array_slice($messages, 0, 50);
             $selected = null;
             $uid = (int)($_GET['uid'] ?? 0);
             if ($uid > 0) $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
             $this->render([
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
-                'selectedMessage'=>$selected,'error'=>null,
+                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
             ]);
         } catch (\Throwable $e) {
             $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$e->getMessage()]);
@@ -137,6 +142,6 @@ final class WebmailController
 
     private function render(array $data): void
     {
-        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null], $data));
+        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false], $data));
     }
 }
