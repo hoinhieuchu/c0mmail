@@ -56,7 +56,7 @@ $rawMessage = $smtp->send(
     $subject,
     'Plain-text integration body',
     '<p>HTML integration body</p>',
-    [['filename' => 'integration.txt', 'mime' => 'text/plain', 'data' => $attachmentData]]
+    [['filename' => 'báo-cáo-tháng.txt', 'mime' => 'text/plain', 'data' => $attachmentData]]
 );
 integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS delivery returns the exact MIME payload');
 
@@ -71,6 +71,7 @@ $uid = (int)$messages[0]['uid'];
 $message = $imap->getMessage($settings, $credentials, 'INBOX', $uid);
 integrationCheck(str_contains($message['body'], 'Plain-text integration body'), 'IMAP MIME plain-text body retrieval');
 integrationCheck(count($message['attachments']) === 1, 'IMAP MIME attachment discovery');
+integrationCheck($message['attachments'][0]['filename'] === 'báo-cáo-tháng.txt', 'RFC 2231 Unicode attachment filename round-trip');
 $attachment = $message['attachments'][0];
 $downloaded = $imap->fetchAttachment($settings, $credentials, 'INBOX', $uid, $attachment['section'], (int)$attachment['encoding']);
 integrationCheck($downloaded === $attachmentData, 'IMAP attachment transfer decoding');
