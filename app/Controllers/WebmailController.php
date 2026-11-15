@@ -71,7 +71,7 @@ final class WebmailController
             $selected = null;
             $uid = (int)($_GET['uid'] ?? 0);
             if ($uid > 0) $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
-            $compose = ['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''];
+            $compose = ['to'=>'','cc'=>'','bcc'=>'','reply_to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''];
             $composeMode = (string)($_GET['compose'] ?? '');
             if ($selected && in_array($composeMode, ['reply', 'forward'], true)) {
                 $subject = (string)$selected['subject'];
@@ -123,7 +123,7 @@ final class WebmailController
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
             $replyTo = trim((string)($_POST['reply_to'] ?? ''));
-            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \\InvalidArgumentException('Invalid Reply-To address.');
+            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid Reply-To address.');
             $replyTo = $replyTo !== '' ? $replyTo : null;
             $fromName = (string)($context['mailbox']['display_name'] ?? '');
             $attachments = $this->uploadedAttachments();
@@ -247,12 +247,16 @@ final class WebmailController
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $replyTo = trim((string)($_POST['reply_to'] ?? ''));
+            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid Reply-To address.');
+            $replyTo = $replyTo !== '' ? $replyTo : null;
+            $fromName = (string)($context['mailbox']['display_name'] ?? '');
             $attachments = $this->uploadedAttachments();
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
             if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
-            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, null, $ccRecipients, $bccRecipients);
+            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, null, $ccRecipients, $bccRecipients, $fromName, $replyTo);
             $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
