@@ -114,11 +114,11 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag, ?string $htmlBody = null, array $attachments = []): void
+    public function appendRawMessage(array $settings, array $credentials, string $folder, string $raw, string $flag): void
     {
         $this->requireExtension();
         if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \InvalidArgumentException('Unsupported IMAP message flag.');
-        $raw = MimeMessageBuilder::build($from, $recipients, $subject, $body, $htmlBody, $attachments);
+        if (strlen($raw) > 30_000_000 || !str_contains($raw, "\r\n\r\n")) throw new \InvalidArgumentException('Invalid or oversized RFC message.');
         $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
         try {
             $target = $this->prefix($settings) . $this->encodeFolder($folder);
