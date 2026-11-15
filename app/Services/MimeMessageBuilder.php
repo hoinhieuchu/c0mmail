@@ -8,7 +8,7 @@ final class MimeMessageBuilder
     public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = []): string
     {
         self::assertHeader($from);
-        self::assertHeader($subject);
+        self::assertHeader($subject, true);
         if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid sender address.');
         if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
         foreach ($recipients as $recipient) {
@@ -97,8 +97,8 @@ final class MimeMessageBuilder
         return '=?UTF-8?B?' . base64_encode($value) . '?=';
     }
 
-    private static function assertHeader(string $value): void
+    private static function assertHeader(string $value, bool $allowEmpty = false): void
     {
-        if ($value === '' || preg_match('/[\r\n\0]/', $value)) throw new \InvalidArgumentException('Invalid email header value.');
+        if ((!$allowEmpty && $value === '') || preg_match('/[\r\n\0]/', $value)) throw new \InvalidArgumentException('Invalid email header value.');
     }
 }
