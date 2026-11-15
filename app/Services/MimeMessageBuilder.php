@@ -7,6 +7,7 @@ final class MimeMessageBuilder
 {
     public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = [], string $fromName = '', ?string $replyTo = null): string
     {
+        $htmlBody = HtmlEmailSanitizer::sanitize($htmlBody);
         self::assertHeader($from);
         self::assertHeader($subject, true);
         self::assertHeader($fromName, true);
