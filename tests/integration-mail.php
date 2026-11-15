@@ -127,6 +127,7 @@ integrationCheck(count($messages) === 1, 'SMTP-delivered message appears in IMAP
 $uid = (int)$messages[0]['uid'];
 $message = $imap->getMessage($settings, $credentials, 'INBOX', $uid);
 integrationCheck(str_contains($message['body'], 'Plain-text integration body'), 'IMAP MIME plain-text body retrieval');
+integrationCheck($message['seen'] === true, 'getMessage marks opened messages as seen');
 integrationCheck(count($message['attachments']) === 1, 'IMAP MIME attachment discovery');
 integrationCheck($message['attachments'][0]['filename'] === 'báo-cáo-tháng.txt', 'RFC 2231 Unicode attachment filename round-trip');
 $attachment = $message['attachments'][0];
