@@ -127,7 +127,7 @@ final class MimeMessageBuilder
         // RFC 2047 encoded-words must stay within 75 octets. Split the source
         // at UTF-8 character boundaries so each independently decoded word is valid.
         $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
-        if ($characters === false) throw new \\InvalidArgumentException('Header text must be valid UTF-8.');
+        if ($characters === false) throw new \InvalidArgumentException('Header text must be valid UTF-8.');
         $chunks = [];
         $chunk = '';
         foreach ($characters as $character) {
