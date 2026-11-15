@@ -18,6 +18,8 @@ def main() -> None:
     parser.add_argument("--capture", required=True)
     parser.add_argument("--username", required=True)
     parser.add_argument("--password", required=True)
+    parser.add_argument("--final-data-reply", default="250 2.0.0 Message accepted for test capture")
+    parser.add_argument("--drop-after-data", action="store_true")
     args = parser.parse_args()
 
     tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -51,7 +53,12 @@ def main() -> None:
                             for item in message_lines
                         ) + b"\r\n"
                         capture.write_bytes(payload)
-                        self.reply("250 2.0.0 Message accepted for test capture")
+                        if args.drop_after_data:
+                            self.rfile.close()
+                            self.wfile.close()
+                            self.connection.close()
+                            return
+                        self.reply(args.final_data_reply)
                         message_lines = []
                         data_mode = False
                     else:
