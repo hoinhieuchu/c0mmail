@@ -103,6 +103,7 @@ final class WebmailController
     public function send(): void
     {
         $user = $this->auth->requireLogin();
+        $ownsSubmission = false;
         try {
             $this->assertPostBodyWithinLimit();
             Csrf::verify();
@@ -121,8 +122,16 @@ final class WebmailController
                 header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
                 exit;
             }
+            if (($submission['status'] ?? '') === 'sending') {
+                $startedAt = (int)($submission['started_at'] ?? 0);
+                if ($startedAt > 0 && (time() - $startedAt) > 120) {
+                    $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
+                    throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
+                }
+                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
+            }
             if (($submission['status'] ?? '') !== 'pending') {
-                throw new \RuntimeException('This send attempt is already in progress or its delivery status is uncertain. Check Sent before trying again.');
+                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
             }
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $rawTo = (string)($_POST['to'] ?? '');
@@ -135,7 +144,8 @@ final class WebmailController
             if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
-            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'sending','mailbox_id'=>$mailboxId];
+            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'sending','mailbox_id'=>$mailboxId,'started_at'=>time()];
+            $ownsSubmission = true;
             // Persist the in-flight state before network I/O. PHP normally writes
             // session data only when the request ends; without this close, a worker
             // crash after SMTP acceptance could leave the old "pending" token and
@@ -175,7 +185,7 @@ final class WebmailController
         } catch (\Throwable $e) {
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
             $submissionId = (string)($_POST['submission_id'] ?? '');
-            if (preg_match('/^[a-f0-9]{32}$/', $submissionId) && isset($_SESSION['webmail_submissions'][$submissionId])
+            if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId) && isset($_SESSION['webmail_submissions'][$submissionId])
                 && ($_SESSION['webmail_submissions'][$submissionId]['status'] ?? '') === 'sending') {
                 $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
             }
@@ -317,8 +327,11 @@ final class WebmailController
         $message = $error->getMessage();
         if (str_contains($message, 'IMAP extension is required')) return 'Webmail requires the PHP IMAP extension. Ask the hosting provider to enable it.';
         if (str_contains($message, 'SMTP server rejected')) return 'The SMTP server rejected the message. Check the recipients and mailbox settings.';
+        if (str_contains($message, 'already in progress')) {
+            return 'A send attempt is still in progress. Wait for it to finish before retrying.';
+        }
         if (str_contains($message, 'SMTP server response timed out') || str_contains($message, 'SMTP server closed')
-            || str_contains($message, 'delivery status is uncertain') || str_contains($message, 'already in progress')) {
+            || str_contains($message, 'delivery status is uncertain')) {
             return 'The SMTP delivery status may be uncertain. Check the Sent folder before attempting another send.';
         }
         if (str_contains($message, 'Active mailbox not found')) return 'The selected mailbox is unavailable or inactive.';
