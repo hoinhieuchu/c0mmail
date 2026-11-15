@@ -87,6 +87,7 @@ jobs:
         image: mariadb:11.4
         env:
           MARIADB_ROOT_PASSWORD: root
+          MARIADB_ROOT_HOST: '%'
           MARIADB_DATABASE: c0mmail_test
         ports:
           - 3306:3306
