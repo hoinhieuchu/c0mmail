@@ -30,4 +30,6 @@ test('MIME builder preserves reply threading headers',function(){ $raw=\App\Serv
 test('MIME builder rejects CRLF in reply threading headers',function(){try{\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Re: Hello','reply',null,[],['in_reply_to'=>"x\r\nBcc: bad@example.test"]);throw new RuntimeException('Expected thread header rejection');}catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'header'));}});
 
 test('IMAP folder discovery strips the server connection prefix',function(){same('INBOX.Sent',\App\Services\ImapClient::stripServerPrefix('{imap.example.test:993/imap/ssl}INBOX.Sent','{imap.example.test:993/imap/ssl}'));same('INBOX',\App\Services\ImapClient::stripServerPrefix('INBOX','{imap.example.test:993/imap/ssl}'));});
+
+test('webmail controller and transport services autoload',function(){same(true,class_exists(\App\Controllers\WebmailController::class));same(true,class_exists(\App\Services\ImapClient::class));same(true,class_exists(\App\Services\SmtpClient::class));same(true,class_exists(\App\Services\MimeMessageBuilder::class));});
 echo "{$count} tests passed.\n";
