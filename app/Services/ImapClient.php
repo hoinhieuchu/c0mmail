@@ -114,26 +114,13 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag): void
+    public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag, ?string $htmlBody = null, array $attachments = []): void
     {
         $this->requireExtension();
         if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \InvalidArgumentException('Unsupported IMAP message flag.');
-        foreach ([$from, $subject] as $header) if (preg_match('/[\r\n\0]/', $header)) throw new \InvalidArgumentException('Invalid message header.');
-        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid sender address.');
-        foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
+        $raw = MimeMessageBuilder::build($from, $recipients, $subject, $body, $htmlBody, $attachments);
         $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
         try {
-            $headers = [
-                'Date: ' . date(DATE_RFC2822),
-                'From: ' . $from,
-                'To: ' . implode(', ', $recipients),
-                'Subject: ' . (function_exists('mb_encode_mimeheader') ? mb_encode_mimeheader($subject, 'UTF-8', 'B') : '=?UTF-8?B?' . base64_encode($subject) . '?='),
-                'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
-                'MIME-Version: 1.0',
-                'Content-Type: text/plain; charset=UTF-8',
-                'Content-Transfer-Encoding: quoted-printable',
-            ];
-            $raw = implode("\r\n", $headers) . "\r\n\r\n" . quoted_printable_encode(str_replace(["\r\n", "\r"], "\n", $body)) . "\r\n";
             $target = $this->prefix($settings) . $this->encodeFolder($folder);
             if (!imap_append($stream, $target, $raw, $flag)) throw new \RuntimeException('Unable to save message to IMAP folder: ' . $this->lastError());
         } finally { imap_close($stream); }
