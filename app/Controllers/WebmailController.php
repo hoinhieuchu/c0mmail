@@ -67,9 +67,11 @@ final class WebmailController
             $recipients = array_values(array_unique(array_map('trim', $recipients)));
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
-            if ($subject === '' && trim($body) === '') throw new \InvalidArgumentException('Email subject or body is required.');
-            if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \InvalidArgumentException('Message exceeds the allowed size.');
-            $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body);
+            $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $attachments = $this->uploadedAttachments();
+            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
+            $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments);
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
                 if ($sentFolder !== null) $this->imap->appendTextMessage($context['settings'], $context['credentials'], $sentFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Seen');
@@ -129,7 +131,9 @@ final class WebmailController
             foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid draft recipient address.');
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
-            if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
+            $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $attachments = $this->uploadedAttachments();
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
             if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
             $this->imap->appendTextMessage($context['settings'], $context['credentials'], $draftFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Draft');
@@ -173,6 +177,36 @@ final class WebmailController
     private function indexWithError(array $user, string $error): void
     {
         $this->render(['user'=>$user,'mailboxes'=>array_values(array_filter($this->mailboxes->forUser((int)$user['id']), static fn(array $m): bool => $m['status'] === 'active')),'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$error]);
+    }
+
+
+    private function uploadedAttachments(): array
+    {
+        if (!isset($_FILES['attachments']) || !is_array($_FILES['attachments']['name'] ?? null)) return [];
+        $files = $_FILES['attachments'];
+        $count = count($files['name']);
+        if ($count > 10) throw new \InvalidArgumentException('A maximum of 10 attachments is allowed.');
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $attachments = [];
+        $totalBytes = 0;
+        for ($i = 0; $i < $count; $i++) {
+            $error = (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($error === UPLOAD_ERR_NO_FILE) continue;
+            if ($error !== UPLOAD_ERR_OK) throw new \RuntimeException('An attachment upload failed (code ' . $error . ').');
+            $tmp = (string)($files['tmp_name'][$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) throw new \RuntimeException('Invalid attachment upload.');
+            $size = (int)($files['size'][$i] ?? 0);
+            if ($size < 0 || $size > 25_000_000) throw new \InvalidArgumentException('An attachment exceeds 25 MB.');
+            $data = file_get_contents($tmp);
+            if ($data === false) throw new \RuntimeException('Unable to read uploaded attachment.');
+            $totalBytes += strlen($data);
+            if ($totalBytes > 25_000_000) throw new \InvalidArgumentException('Total attachment size exceeds 25 MB.');
+            $filename = basename(str_replace('\\', '/', (string)($files['name'][$i] ?? 'attachment.bin')));
+            if ($filename === '' || preg_match('/[\x00-\x1F\x7F]/', $filename)) throw new \InvalidArgumentException('Invalid attachment filename.');
+            $mime = $finfo->file($tmp) ?: 'application/octet-stream';
+            $attachments[] = ['filename'=>$filename,'mime'=>$mime,'data'=>$data];
+        }
+        return $attachments;
     }
 
     private function render(array $data): void
