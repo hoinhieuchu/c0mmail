@@ -16,6 +16,7 @@
 - IMAP listing uses UID search and offset-based pagination; page stability under new arrivals still needs UID-cursor pagination and UIDVALIDITY handling.
 - IMAP move uses `imap_mail_move`; do not call broad `imap_expunge` because it can expunge unrelated messages marked Deleted in the source folder.
 - SMTP acceptance and saving the Sent copy are separate outcomes. Never report SMTP acceptance as failed solely because the Sent APPEND failed.
+- Compose forms carry a per-session one-time submission token; accepted attempts retain a stable Message-ID and duplicate POSTs return the existing accepted state instead of sending again. A request that ends after SMTP submission starts but before acceptance is recorded is marked uncertain and must be reconciled against Sent.
 - Real CraneMail hostnames, TLS configuration, credentials, and live delivery remain environment-dependent and must be tested on the target server.
 - Do not claim real-server integration is verified by unit tests or GitHub Actions alone.
 
@@ -31,3 +32,4 @@
 - Webmail view and action errors are mapped to user-safe messages; detailed server exception text is not rendered.
 - Attachment downloads verify the requested folder against the authenticated mailbox's discovered folders.
 - The MIME header fallback emits folded RFC 2047 encoded-words when mbstring's encoder is unavailable.
+- Submission idempotency is session-scoped, not durable across session expiry or a lost session store; database-backed delivery idempotency remains a future hardening task.

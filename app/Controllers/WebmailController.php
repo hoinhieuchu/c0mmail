@@ -83,6 +83,23 @@ final class WebmailController
             $this->assertPostBodyWithinLimit();
             Csrf::verify();
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $submissionId = (string)($_POST['submission_id'] ?? '');
+            $submission = $_SESSION['webmail_submissions'][$submissionId] ?? null;
+            if (!preg_match('/^[a-f0-9]{32}$/', $submissionId) || !is_array($submission)) {
+                throw new \InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
+            }
+            if (isset($submission['mailbox_id']) && (int)$submission['mailbox_id'] !== $mailboxId) {
+                throw new \InvalidArgumentException('This compose form is not valid for the selected mailbox.');
+            }
+            if (($submission['status'] ?? '') === 'accepted') {
+                $folder = (string)($submission['folder'] ?? 'INBOX');
+                $copy = (string)($submission['sent_copy'] ?? 'unavailable');
+                header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
+                exit;
+            }
+            if (($submission['status'] ?? '') !== 'pending') {
+                throw new \RuntimeException('This send attempt is already in progress or its delivery status is uncertain. Check Sent before trying again.');
+            }
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $rawTo = (string)($_POST['to'] ?? '');
             $recipients = preg_split('/[,;]+/', $rawTo, -1, PREG_SPLIT_NO_EMPTY) ?: [];
@@ -94,7 +111,10 @@ final class WebmailController
             if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
-            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders);
+            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'sending','mailbox_id'=>$mailboxId];
+            $messageId = '<' . $submissionId . '@c0m.me>';
+            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId);
+            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>'INBOX','sent_copy'=>'unavailable'];
             $sentFolder = null;
             $sentCopy = 'unavailable';
             try {
@@ -107,9 +127,15 @@ final class WebmailController
                 $sentCopy = 'failed';
                 error_log('Sent-folder copy failed after SMTP accepted message.');
             }
+            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>$sentFolder ?? 'INBOX','sent_copy'=>$sentCopy];
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
             exit;
         } catch (\Throwable $e) {
+            $submissionId = (string)($_POST['submission_id'] ?? '');
+            if (preg_match('/^[a-f0-9]{32}$/', $submissionId) && isset($_SESSION['webmail_submissions'][$submissionId])
+                && ($_SESSION['webmail_submissions'][$submissionId]['status'] ?? '') === 'sending') {
+                $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
+            }
             error_log('Webmail send failed: ' . get_class($e));
             $this->indexWithError($user, $this->userFacingError($e));
         }
@@ -248,8 +274,9 @@ final class WebmailController
         $message = $error->getMessage();
         if (str_contains($message, 'IMAP extension is required')) return 'Webmail requires the PHP IMAP extension. Ask the hosting provider to enable it.';
         if (str_contains($message, 'SMTP server rejected')) return 'The SMTP server rejected the message. Check the recipients and mailbox settings.';
-        if (str_contains($message, 'SMTP server response timed out') || str_contains($message, 'SMTP server closed')) {
-            return 'The SMTP connection ended before acceptance could be confirmed. Check the Sent folder before retrying.';
+        if (str_contains($message, 'SMTP server response timed out') || str_contains($message, 'SMTP server closed')
+            || str_contains($message, 'delivery status is uncertain') || str_contains($message, 'already in progress')) {
+            return 'The SMTP delivery status may be uncertain. Check the Sent folder before attempting another send.';
         }
         if (str_contains($message, 'Active mailbox not found')) return 'The selected mailbox is unavailable or inactive.';
         return 'The mail operation could not be completed. Check the mail server settings and application logs.';
@@ -314,6 +341,16 @@ final class WebmailController
 
     private function render(array $data): void
     {
-        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false,'compose'=>['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>'']], $data));
+        $data['compose'] = array_merge(['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $data['compose'] ?? []);
+        if (empty($data['compose']['submission_id'])) {
+            $tokens = $_SESSION['webmail_submissions'] ?? [];
+            if (!is_array($tokens)) $tokens = [];
+            $token = bin2hex(random_bytes(16));
+            $tokens[$token] = ['status'=>'pending'];
+            if (count($tokens) > 20) $tokens = array_slice($tokens, -20, null, true);
+            $_SESSION['webmail_submissions'] = $tokens;
+            $data['compose']['submission_id'] = $token;
+        }
+        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false], $data));
     }
 }

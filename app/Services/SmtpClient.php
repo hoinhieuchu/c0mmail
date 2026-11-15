@@ -5,7 +5,7 @@ namespace App\Services;
 /** Authenticated SMTP client with mandatory TLS and RFC MIME message delivery. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = []): string
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null): string
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -14,7 +14,7 @@ final class SmtpClient
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid SMTP port.');
         if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
         if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
-        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders);
+        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
         $context = stream_context_create(['ssl' => [
             'verify_peer' => true,

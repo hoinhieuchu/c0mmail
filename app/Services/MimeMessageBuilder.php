@@ -5,7 +5,7 @@ namespace App\Services;
 /** Builds RFC 5322/MIME messages shared by SMTP delivery and IMAP Sent/Drafts copies. */
 final class MimeMessageBuilder
 {
-    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = []): string
+    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null): string
     {
         self::assertHeader($from);
         self::assertHeader($subject, true);
@@ -29,12 +29,16 @@ final class MimeMessageBuilder
         }
         $toHeader = implode(', ', array_unique($recipients));
         if (strlen($toHeader) > 900) throw new \InvalidArgumentException('Recipient header exceeds the allowed length.');
+        $messageId ??= '<' . bin2hex(random_bytes(16)) . '@c0m.me>';
+        if (!preg_match('/^<[^<>\s@]+@[a-zA-Z0-9.-]+>$/D', $messageId)) {
+            throw new \InvalidArgumentException('Invalid Message-ID value.');
+        }
         $headers = [
             'Date: ' . date(DATE_RFC2822),
             'From: ' . $from,
             'To: ' . $toHeader,
             'Subject: ' . self::encodeHeader($subject),
-            'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
+            'Message-ID: ' . $messageId,
             'MIME-Version: 1.0',
         ];
         foreach (['in_reply_to' => 'In-Reply-To', 'references' => 'References'] as $key => $headerName) {
