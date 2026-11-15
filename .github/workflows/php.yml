@@ -31,7 +31,7 @@ jobs:
           openssl req -newkey rsa:2048 -nodes \
             -keyout /tmp/greenmail.key -out /tmp/greenmail.csr \
             -subj "/CN=localhost"
-          printf "subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature,keyEncipherment\nbasicConstraints=critical,CA:FALSE\n" > /tmp/greenmail.ext
+          printf "subjectAltName=DNS:localhost,IP:127.0.0.1\nextendedKeyUsage=serverAuth\nkeyUsage=critical,digitalSignature,keyEncipherment\nbasicConstraints=critical,CA:FALSE\n" > /tmp/greenmail.ext
           openssl x509 -req -in /tmp/greenmail.csr -CA /tmp/greenmail-ca.crt \
             -CAkey /tmp/greenmail-ca.key -CAcreateserial -out /tmp/greenmail.crt \
             -days 1 -sha256 -extfile /tmp/greenmail.ext
