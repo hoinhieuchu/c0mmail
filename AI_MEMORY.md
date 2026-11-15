@@ -11,7 +11,7 @@
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (56 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (58 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
@@ -66,3 +66,5 @@
 - IMAP MOVE intentionally avoids `imap_expunge()`, because that function expunges every message already flagged `\\Deleted` in the source folder. The GreenMail integration test now creates an unrelated pre-deleted message, moves a different UID, and verifies the unrelated deleted UID remains on the server.
 
 - IMAP message retrieval now rejects empty overview results for UIDs returned by search, validates each overview UID against the requested set, verifies the selected UID before fetching MIME structure, surfaces structure errors, and returns `seen=true` after successfully setting the Seen flag. GreenMail integration verifies the opened-message state.
+
+- IMAP attachment fetch validates a positive UID, a bounded numeric MIME section path (max 20 levels / 64 characters), and a supported transfer encoding before opening the mailbox or fetching bytes. Unit tests cover valid and malformed references.
