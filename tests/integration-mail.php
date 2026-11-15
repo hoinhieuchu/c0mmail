@@ -28,6 +28,7 @@ $folders = $imap->folders($settings, $credentials);
 $folderNames = array_column($folders, 'name');
 integrationCheck(in_array('INBOX', $folderNames, true), 'GreenMail IMAP folder discovery');
 integrationCheck($imap->uidValidity($settings, $credentials, 'INBOX') > 0, 'GreenMail UIDVALIDITY retrieval');
+integrationCheck($imap->listMessages($settings, $credentials, 'INBOX', 10, 0, 'c0mmail-no-such-message-' . bin2hex(random_bytes(4))) === [], 'IMAP empty search returns an empty page without a protocol error');
 
 // Create the standard folders needed to exercise APPEND and MOVE.
 $prefix = '{localhost:3993/imap/ssl}';
