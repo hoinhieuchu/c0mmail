@@ -28,4 +28,6 @@ test('MIME builder rejects header injection in subjects',function(){try{\App\Ser
 
 test('MIME builder preserves reply threading headers',function(){ $raw=\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Re: Hello','reply',null,[],['in_reply_to'=>'<one@example.test>','references'=>'<one@example.test>']); same(true,str_contains($raw,'In-Reply-To: <one@example.test>')); same(true,str_contains($raw,'References: <one@example.test>'));});
 test('MIME builder rejects CRLF in reply threading headers',function(){try{\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Re: Hello','reply',null,[],['in_reply_to'=>"x\r\nBcc: bad@example.test"]);throw new RuntimeException('Expected thread header rejection');}catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'header'));}});
+
+test('IMAP folder discovery strips the server connection prefix',function(){same('INBOX.Sent',\App\Services\ImapClient::stripServerPrefix('{imap.example.test:993/imap/ssl}INBOX.Sent','{imap.example.test:993/imap/ssl}'));same('INBOX',\App\Services\ImapClient::stripServerPrefix('INBOX','{imap.example.test:993/imap/ssl}'));});
 echo "{$count} tests passed.\n";
