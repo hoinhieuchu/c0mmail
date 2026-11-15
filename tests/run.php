@@ -92,13 +92,15 @@ test('IMAP message retrieval enforces the 40 MB size boundary',function(){
 });
 
 test('SMTP explicit 4xx and 5xx replies are definitive rejections',function(){
- $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
- if($pair===false)throw new RuntimeException('Unable to create SMTP protocol test socket pair');
- fwrite($pair[1],"550 5.7.1 rejected\\r\\n");
- $method=new ReflectionMethod(\\App\\Services\\SmtpClient::class,'expect');
- try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP protocol rejection');}
- catch(\\App\\Services\\SmtpProtocolException $e){same(550,$e->responseCode);same(true,$e->isNegativeReply());}
- finally{fclose($pair[0]);fclose($pair[1]);}
+ foreach([421,450,550,599] as $code){
+  $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
+  if($pair===false)throw new RuntimeException('Unable to create SMTP protocol test socket pair');
+  fwrite($pair[1],$code." rejection\\r\\n");
+  $method=new ReflectionMethod(\\App\\Services\\SmtpClient::class,'expect');
+  try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP protocol rejection');}
+  catch(\\App\\Services\\SmtpProtocolException $e){same($code,$e->responseCode);same(true,$e->isNegativeReply());}
+  finally{fclose($pair[0]);fclose($pair[1]);}
+ }
 });
 test('SMTP unexpected non-negative replies remain ambiguous after DATA',function(){
  $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
@@ -108,5 +110,15 @@ test('SMTP unexpected non-negative replies remain ambiguous after DATA',function
  try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP protocol rejection');}
  catch(\\App\\Services\\SmtpProtocolException $e){same(354,$e->responseCode);same(false,$e->isNegativeReply());}
  finally{fclose($pair[0]);fclose($pair[1]);}
+});
+test('SMTP connection loss without a final reply is not misclassified as a negative response',function(){
+ $pair=stream_socket_pair(STREAM_PF_UNIX,STREAM_SOCK_STREAM,STREAM_IPPROTO_IP);
+ if($pair===false)throw new RuntimeException('Unable to create SMTP protocol test socket pair');
+ fclose($pair[1]);
+ $method=new ReflectionMethod(\\App\\Services\\SmtpClient::class,'expect');
+ try{$method->invoke(new \\App\\Services\\SmtpClient(),$pair[0],[250]);throw new RuntimeException('Expected SMTP connection-loss exception');}
+ catch(\\App\\Services\\SmtpProtocolException $e){throw new RuntimeException('A missing SMTP reply must not be represented as a protocol rejection');}
+ catch(\\RuntimeException $e){same(true,str_contains($e->getMessage(),'closed the connection'));}
+ finally{fclose($pair[0]);}
 });
 echo "{$count} tests passed.\n";
