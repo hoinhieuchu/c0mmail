@@ -71,7 +71,8 @@ final class WebmailController
                 'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
-            $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$e->getMessage()]);
+            error_log('Webmail mailbox view failed: ' . get_class($e));
+            $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$this->userFacingError($e)]);
         }
     }
 
@@ -125,6 +126,8 @@ final class WebmailController
             $folder = (string)($_GET['folder'] ?? 'INBOX');
             $section = (string)($_GET['section'] ?? '');
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
             $message = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
             $attachment = null;
             foreach ($message['attachments'] as $item) if ($item['section'] === $section) { $attachment = $item; break; }

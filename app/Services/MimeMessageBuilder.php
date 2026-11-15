@@ -105,7 +105,11 @@ final class MimeMessageBuilder
     private static function encodeHeader(string $value): string
     {
         if (function_exists('mb_encode_mimeheader')) return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
-        return '=?UTF-8?B?' . base64_encode($value) . '?=';
+        $chunks = str_split(base64_encode($value), 48);
+        return implode("\r\n ", array_map(
+            static fn(string $chunk): string => '=?UTF-8?B?' . $chunk . '?=',
+            $chunks
+        ));
     }
 
     private static function assertHeader(string $value, bool $allowEmpty = false): void

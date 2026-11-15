@@ -28,3 +28,6 @@
 - Oversized PHP POST bodies are detected before CSRF validation masks the upload error.
 - Sent-copy archival status is displayed independently from SMTP acceptance.
 - Public upload limits are documented and supplied through `public/.user.ini` (host handler support must be confirmed).
+- Webmail view and action errors are mapped to user-safe messages; detailed server exception text is not rendered.
+- Attachment downloads verify the requested folder against the authenticated mailbox's discovered folders.
+- The MIME header fallback emits folded RFC 2047 encoded-words when mbstring's encoder is unavailable.

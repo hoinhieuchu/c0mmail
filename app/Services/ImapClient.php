@@ -100,7 +100,9 @@ final class ImapClient
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
             $attachments = [];
             $body = $this->extractBody($stream, $uid, $structure, $attachments);
-            imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID);
+            if (!imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID)) {
+                throw new \RuntimeException('Message could not be marked as read.');
+            }
             return [
                 'uid' => $uid,
                 'subject' => $this->decodeHeader((string)($item->subject ?? '(no subject)')),
