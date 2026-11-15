@@ -26,13 +26,13 @@ final class WebmailController
         private SendAttemptRepository $sendAttempts
     ) {}
 
-    public function index(): void
+    public function index(?string $forcedError = null, array $composeOverride = []): void
     {
         $user = $this->auth->requireLogin();
         $available = array_values(array_filter($this->mailboxes->forUser((int)$user['id']), static fn(array $m): bool => $m['status'] === 'active'));
         $mailboxId = (int)($_GET['mailbox'] ?? ($available[0]['id'] ?? 0));
         if ($mailboxId < 1) {
-            $this->render(['user'=>$user,'mailboxes'=>$available,'error'=>'No active mailbox is assigned to your account.','folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null]);
+            $this->render(['user'=>$user,'mailboxes'=>$available,'error'=>$forcedError ?? 'No active mailbox is assigned to your account.','folders'=>[],'compose'=>$composeOverride,'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null]);
             return;
         }
         try {
@@ -85,7 +85,7 @@ final class WebmailController
                     }
                 }
             }
-            $compose = ['to'=>'','cc'=>'','bcc'=>'','reply_to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''];
+            $compose = array_merge(['to'=>'','cc'=>'','bcc'=>'','reply_to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $composeOverride);
             $composeMode = (string)($_GET['compose'] ?? '');
             if ($selected && in_array($composeMode, ['reply', 'forward'], true)) {
                 $subject = (string)$selected['subject'];
@@ -107,7 +107,7 @@ final class WebmailController
             $this->render([
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
-                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
+                'selectedMessage'=>$selected,'error'=>$forcedError,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
                 'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'oldestUid'=>$oldestUid,'latestUid'=>$latestUid,'relatedMessages'=>$relatedMessages,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
@@ -428,7 +428,25 @@ final class WebmailController
 
     private function indexWithError(array $user, string $error): void
     {
-        $this->render(['user'=>$user,'mailboxes'=>array_values(array_filter($this->mailboxes->forUser((int)$user['id']), static fn(array $m): bool => $m['status'] === 'active')),'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$error]);
+        if (isset($_POST['mailbox_id'])) $_GET['mailbox'] = (string)(int)$_POST['mailbox_id'];
+        $_GET['folder'] = (string)($_POST['folder'] ?? $_POST['source'] ?? 'INBOX');
+        if (isset($_POST['q'])) $_GET['q'] = (string)$_POST['q'];
+        if (isset($_POST['uid'])) $_GET['uid'] = (string)(int)$_POST['uid'];
+        unset($_GET['compose']);
+
+        $compose = [
+            'submission_id' => (string)($_POST['submission_id'] ?? ''),
+            'to' => (string)($_POST['to'] ?? ''),
+            'cc' => (string)($_POST['cc'] ?? ''),
+            'bcc' => (string)($_POST['bcc'] ?? ''),
+            'reply_to' => (string)($_POST['reply_to'] ?? ''),
+            'subject' => (string)($_POST['subject'] ?? ''),
+            'body' => (string)($_POST['body'] ?? ''),
+            'html_body' => HtmlEmailSanitizer::sanitize((string)($_POST['html_body'] ?? '')) ?? '',
+            'in_reply_to' => (string)($_POST['in_reply_to'] ?? ''),
+            'references' => (string)($_POST['references'] ?? ''),
+        ];
+        $this->index($error, $compose);
     }
 
     private function userFacingError(\Throwable $error): string
