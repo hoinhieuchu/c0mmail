@@ -16,7 +16,7 @@ $db = new PDO(
     [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES=>false]
 );
 
-foreach (['001_initial_schema.sql', '002_mail_send_attempts.sql'] as $migration) {
+foreach (['001_initial_schema.sql', '002_mail_send_attempts.sql', '003_send_attempt_failed_state.sql'] as $migration) {
     $sql = file_get_contents(dirname(__DIR__) . '/database/migrations/' . $migration);
     if ($sql === false) throw new RuntimeException('Unable to read migration ' . $migration);
     foreach (explode(';', $sql) as $statement) {
@@ -54,6 +54,14 @@ try {
     } catch (InvalidArgumentException $e) {
         $check(str_contains($e->getMessage(), 'different message content'), 'token cannot be reused with changed payload');
     }
+
+    $failedToken = bin2hex(random_bytes(16));
+    $failedHash = hash('sha256', 'retryable payload');
+    $repo->createPending($failedToken, $userId, $mailboxId);
+    $repo->claim($failedToken, $userId, $mailboxId, $failedHash, "<{$failedToken}@c0m.me>");
+    $repo->markFailed($failedToken, $userId, $mailboxId);
+    $safeRetry = $repo->claim($failedToken, $userId, $mailboxId, $failedHash, "<{$failedToken}@c0m.me>");
+    $check(($safeRetry['status'] ?? '') === 'sending' && !empty($safeRetry['claimed']), 'definitive pre-DATA failure permits a safe retry with the same token');
 
     $repo->markUncertain($token, $userId, $mailboxId);
     $uncertain = $repo->claim($token, $userId, $mailboxId, $hash, $messageId);
