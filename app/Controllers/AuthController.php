@@ -17,7 +17,7 @@ final class AuthController
         $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP) ?: 'unknown';
 
         if ($this->loginLimits->isBlocked($email, $ip)) {
-            $this->view->render('login', ['title'=>'Sign in', 'error'=>'Too many sign-in attempts. Try again in 15 minutes.']);
+            $this->view->render('login', ['title'=>'Sign in', 'error'=>'Email or password is incorrect.']);
             return;
         }
 
