@@ -7,14 +7,17 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 - Local account authentication, role-based admin access, CSRF protection, and session ID rotation.
 - Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
 - Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
-- Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, manual activation/suspension confirmation, and SMTP/IMAP client settings.
-- SQL migration, CLI account bootstrap, built-in test runner, and GitHub Actions PHP lint/test workflow.
+- Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
+- Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read-state updates, and moving messages to Trash/Spam folders when available.
+- SMTP sending with authenticated SSL/STARTTLS transport; sent messages are copied to the server's Sent folder when that folder is exposed.
+- Draft saving to the server's Drafts folder when available.
+- SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-This is an account-management foundation, not a browser-based IMAP client. It does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Current compose support is plain text; MIME attachments, rich HTML composition, search, pagination beyond the latest 100 messages, and full folder-specific retention policies remain future work.
 
 ## Requirements
 
-PHP 8.1+, PDO MySQL, OpenSSL, JSON, sessions. MariaDB 10.5+ or MySQL 8+. cURL is optional.
+PHP 8.1+, PDO MySQL, OpenSSL, JSON, sessions, and the PHP IMAP extension (`ext-imap`) for browser webmail. MariaDB 10.5+ or MySQL 8+. cURL is optional.
 
 ## Quick start
 
@@ -35,6 +38,6 @@ Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -
 
 ## Security and limitations
 
-Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. Initial release does not include password reset, member self-service registration, mailbox password reset, OIDC, webmail message reading/composition, billing, or domain verification. Configure these before public production launch.
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, MIME attachments, rich HTML composition, or full-text search. Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
 See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
