@@ -141,8 +141,8 @@ final class WebmailController
                 header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
                 exit;
             }
-            if ($status === 'sending') {
-                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
+            if ($status === 'sending' && empty($attempt['claimed'])) {
+                throw new \\RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
             }
             if ($status !== 'sending') {
                 throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
