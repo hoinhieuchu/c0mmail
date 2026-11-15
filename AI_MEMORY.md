@@ -7,16 +7,17 @@
 - Keep changes scoped to the PHP MVC webmail application and its tests/docs.
 
 ## Architecture
+- Database migrations: import `database/migrations/001_initial_schema.sql` followed by `002_mail_send_attempts.sql`; the latter is required for durable SMTP idempotency.
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (38 cases); protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (40 cases before durable-send-repository follow-up); protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
 - IMAP move uses `imap_mail_move`; do not call broad `imap_expunge` because it can expunge unrelated messages marked Deleted in the source folder.
 - SMTP acceptance and saving the Sent copy are separate outcomes. Never report SMTP acceptance as failed solely because the Sent APPEND failed.
-- Compose forms carry a per-session one-time submission token; the `sending` state (including its start time) is explicitly persisted with `session_write_close()` before SMTP network I/O, then SMTP acceptance is persisted before optional Sent APPEND. Duplicate POSTs during delivery see `sending` and are rejected without mutating the active attempt; a `sending` state older than two minutes is converted to `uncertain` and must be reconciled against Sent. Accepted attempts retain a stable Message-ID and return the existing accepted state instead of sending again. This remains session-scoped, not durable across session expiry or loss of the session store.
+- Compose forms carry a cryptographically random one-time token persisted in `mail_send_attempts`, scoped to user and mailbox. An atomic conditional DB update claims `pending` as `sending` before SMTP I/O; only the claim winner may send. The DB record stores a SHA-256 fingerprint of recipients, body, threading metadata and attachment bytes, rejecting reuse of the token with changed content. SMTP acceptance is persisted as `accepted` before optional Sent APPEND; accepted retries return the recorded result. A `sending` row older than two minutes becomes `uncertain` and is never automatically retried. Records older than 30 days are purged when a new compose token is issued. This is durable across PHP sessions/workers, but it cannot provide true exactly-once delivery if a process crashes after the SMTP server accepts DATA and before the acceptance update; that case is deliberately blocked as uncertain to prevent automatic duplicates.
 - Real CraneMail hostnames, TLS configuration, credentials, and live delivery remain environment-dependent and must be tested on the target server.
 - Do not claim real-server integration is verified by unit tests or GitHub Actions alone.
 
