@@ -11,6 +11,7 @@ use App\Services\ImapClient;
 use App\Services\MailboxService;
 use App\Services\MimeMessageBuilder;
 use App\Services\SmtpClient;
+use App\Services\SmtpDeliveryException;
 
 final class WebmailController
 {
@@ -106,6 +107,7 @@ final class WebmailController
     {
         $user = $this->auth->requireLogin();
         $ownsSubmission = false;
+        $smtpAccepted = false;
         $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
         $submissionId = (string)($_POST['submission_id'] ?? '');
         try {
@@ -164,6 +166,7 @@ final class WebmailController
                 $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders,
                 $messageId, $ccRecipients, $bccRecipients, $fromName, $replyTo
             );
+            $smtpAccepted = true;
 
             // Persist SMTP acceptance before the optional IMAP Sent APPEND.
             $this->sendAttempts->markAccepted($submissionId, (int)$user['id'], $mailboxId);
@@ -185,9 +188,14 @@ final class WebmailController
         } catch (\Throwable $e) {
             if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
                 try {
-                    $this->sendAttempts->markUncertain($submissionId, (int)$user['id'], $mailboxId);
-                } catch (\Throwable $stateError) {
-                    error_log('Unable to persist uncertain mail-send state: ' . get_class($stateError));
+                    $uncertain = $smtpAccepted || ($e instanceof SmtpDeliveryException && $e->deliveryUncertain);
+                    if ($uncertain) {
+                        $this->sendAttempts->markUncertain($submissionId, (int)$user['id'], $mailboxId);
+                    } else {
+                        $this->sendAttempts->markFailed($submissionId, (int)$user['id'], $mailboxId);
+                    }
+                } catch (\\Throwable $stateError) {
+                    error_log('Unable to persist mail-send failure state: ' . get_class($stateError));
                 }
             }
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
