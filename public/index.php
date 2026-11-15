@@ -18,7 +18,7 @@ $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$provid
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
 $router->get('/login',fn()=>$authController->showLogin());$router->post('/login',fn()=>$authController->login());$router->post('/logout',fn()=>$authController->logout());
-$router->get('/dashboard',fn()=>$dashboard->index());$router->get('/mail',fn()=>$webmail->index());$router->post('/mail/send',fn()=>$webmail->send());$router->post('/mail/draft',fn()=>$webmail->saveDraft());$router->post('/mail/move',fn()=>$webmail->move());$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
+$router->get('/dashboard',fn()=>$dashboard->index());$router->get('/mail',fn()=>$webmail->index());$router->get('/mail/attachment',fn()=>$webmail->downloadAttachment());$router->post('/mail/send',fn()=>$webmail->send());$router->post('/mail/draft',fn()=>$webmail->saveDraft());$router->post('/mail/move',fn()=>$webmail->move());$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
 $router->post('/admin/mailboxes/{id}/activate',fn(array $p)=>$admin->activateManual((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/suspend',fn(array $p)=>$admin->suspend((int)$p['id']));
 $router->dispatch($_SERVER['REQUEST_METHOD']??'GET',parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/');
