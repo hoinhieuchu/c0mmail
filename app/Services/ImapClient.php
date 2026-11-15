@@ -37,7 +37,7 @@ final class ImapClient
             if ($query !== null && trim($query) !== '') {
                 $query = trim($query);
                 if (strlen($query) > 200 || preg_match('/[\x00-\x1F\x7F]/', $query)) throw new \InvalidArgumentException('Search query contains unsupported characters.');
-                $criteria = 'TEXT "' . addcslashes($query, "\\\\\"") . '"';
+                $criteria = 'TEXT "' . addcslashes($query, "\\\"") . '"';
             }
             $uids = imap_search($stream, $criteria, SE_UID);
             if ($uids === false) return [];
