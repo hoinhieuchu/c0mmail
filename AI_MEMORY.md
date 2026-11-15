@@ -21,7 +21,7 @@
 - Do not claim real-server integration is verified by unit tests or GitHub Actions alone.
 
 ## Recent hardening
-- IMAP search excludes messages marked Deleted.
+- IMAP search excludes messages marked Deleted and now distinguishes an empty result set from an IMAP protocol failure by clearing and inspecting the ext-imap error queue. Message-summary lookup failures are surfaced instead of silently becoming an empty inbox.
 - Inbound attachment transfer decoding accepts all defined IMAP encoding values, including `ENCOTHER` as opaque data, and rejects malformed base64 instead of silently returning an empty attachment.
 - Inbound MIME attachment filenames support RFC 2231 single-value and segmented UTF-8 parameters, with legacy `filename`/`name` fallback.
 - IMAP folder names reject control characters and IMAP mailbox URL delimiters.
