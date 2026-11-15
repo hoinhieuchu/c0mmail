@@ -155,7 +155,7 @@ final class ImapClient
             foreach ($uids as $uid) {
                 if (isset($byUid[$uid])) $ordered[] = $byUid[$uid];
             }
-            if (!$ordered) throw new \\RuntimeException('IMAP summaries did not include any requested UIDs.');
+            if (!$ordered) throw new \RuntimeException('IMAP summaries did not include any requested UIDs.');
             return $ordered;
         } finally { imap_close($stream); }
     }
