@@ -5,10 +5,11 @@ namespace App\Services;
 /** Builds RFC 5322/MIME messages shared by SMTP delivery and IMAP Sent/Drafts copies. */
 final class MimeMessageBuilder
 {
-    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = []): string
+    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = [], string $fromName = '', ?string $replyTo = null): string
     {
         self::assertHeader($from);
         self::assertHeader($subject, true);
+        self::assertHeader($fromName, true);
         if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid sender address.');
         if (count($recipients) + count($ccRecipients) + count($bccRecipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
         foreach (array_merge($recipients, $ccRecipients, $bccRecipients) as $recipient) {
@@ -39,13 +40,14 @@ final class MimeMessageBuilder
         }
         $headers = [
             'Date: ' . date(DATE_RFC2822),
-            'From: ' . $from,
+            'From: ' . ($fromName !== '' ? self::encodeHeader($fromName) . ' <' . $from . '>' : $from),
             'To: ' . $toHeader,
             'Subject: ' . self::encodeHeader($subject),
             'Message-ID: ' . $messageId,
             'MIME-Version: 1.0',
         ];
         if ($ccHeader !== '') $headers[] = 'Cc: ' . $ccHeader;
+        if ($replyTo !== null && $replyTo !== '') $headers[] = 'Reply-To: <' . $replyTo . '>';
         foreach (['in_reply_to' => 'In-Reply-To', 'references' => 'References'] as $key => $headerName) {
             $value = trim((string)($threadHeaders[$key] ?? ''));
             if ($value !== '') {
