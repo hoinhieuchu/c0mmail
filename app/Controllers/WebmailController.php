@@ -38,7 +38,7 @@ final class WebmailController
             if (!in_array($folder, $folderNames, true)) $folder = in_array('INBOX', $folderNames, true) ? 'INBOX' : ($folderNames[0] ?? 'INBOX');
             $page = max(1, min(1000, (int)($_GET['page'] ?? 1)));
             $query = trim((string)($_GET['q'] ?? ''));
-            if (strlen($query) > 200) throw new \\InvalidArgumentException('Search query is too long.');
+            if (strlen($query) > 200) throw new \InvalidArgumentException('Search query is too long.');
             $messages = $this->imap->listMessages($context['settings'], $context['credentials'], $folder, 51, ($page - 1) * 50, $query !== '' ? $query : null);
             $hasMore = count($messages) > 50;
             $messages = array_slice($messages, 0, 50);
