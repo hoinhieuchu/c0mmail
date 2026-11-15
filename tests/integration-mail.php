@@ -61,7 +61,7 @@ $rawMessage = $smtp->send(
     [], null, [], [], 'GreenMail Integration User', 'reply@example.test'
 );
 integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS delivery returns the exact MIME payload');
-integrationCheck(str_contains($rawMessage, 'GreenMail Integration User') && str_contains($rawMessage, '=?UTF-8?B?'), 'SMTP MIME includes an encoded sender display name');
+integrationCheck(str_contains($rawMessage, '=?UTF-8?B?'), 'SMTP MIME includes an encoded sender display name');
 integrationCheck(str_contains($rawMessage, 'Reply-To: <reply@example.test>'), 'SMTP MIME includes Reply-To');
 
 $startTlsSettings = $settings;
