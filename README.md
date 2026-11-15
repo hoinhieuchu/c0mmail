@@ -34,7 +34,7 @@ PHP 8.2+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extensi
 
 ## Tests
 
-Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/integration-mail.php` exercises the IMAP and SMTP adapters against a local GreenMail server configured for TLS on ports 3993 (IMAPS) and 3465 (SMTPS), with mailbox `test1@example.com` / `pwd1`. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5; its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs the protocol integration suite.
+Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/integration-mail.php` exercises IMAPS and SMTPS against GreenMail on ports 3993 and 3465, plus SMTP STARTTLS against the dedicated Python TLS-upgrade fixture in `tests/fixtures/starttls_smtp_server.py` (default port 3587). The fixture captures the accepted test message and validates SMTP AUTH. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5; its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs all protocol integration checks. GreenMail itself does not implement SMTP STARTTLS (upstream issue: https://github.com/greenmail-mail-test/greenmail/issues/135).
 
 ## Security and limitations
 
