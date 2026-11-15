@@ -26,7 +26,11 @@ final class AdminMailboxController
             $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password];
             header('Location: /admin/mailboxes');exit;
         } catch (\Throwable $e) {
-            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'created'=>null,'providerName'=>$this->providerName]);
+            error_log('Mailbox registration failed: ' . get_class($e));
+            $message = $e instanceof \InvalidArgumentException
+                ? $e->getMessage()
+                : 'Mailbox registration could not be completed. Check provider settings and application logs.';
+            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$message,'created'=>null,'providerName'=>$this->providerName]);
         }
     }
     public function activateManual(int $id):void

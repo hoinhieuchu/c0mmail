@@ -21,7 +21,7 @@ final class MailboxService
                 'ciphertext'=>base64_encode($cipher),'nonce'=>bin2hex($nonce),'tag'=>bin2hex($tag)]);
         } catch (\Throwable $e) {
             if(is_string($result['provider_id']??null)&&$result['provider_id']!=='') {
-                try{$this->provider->delete($result['provider_id']);}catch(\Throwable $cleanup){error_log('Mailbox provider compensation failed: '.$cleanup->getMessage());}
+                try{$this->provider->delete($result['provider_id']);}catch(\Throwable $cleanup){error_log('Mailbox provider compensation failed: '.get_class($cleanup));}
             }
             throw $e;
         }
