@@ -42,7 +42,7 @@ jobs:
           sudo cp /tmp/greenmail-ca.crt /usr/local/share/ca-certificates/greenmail-test-ca.crt
           sudo update-ca-certificates
           docker run -d --name greenmail \
-            -p 3465:3465 -p 3993:3993 \
+            -p 3025:3025 -p 3465:3465 -p 3993:3993 \
             -v /tmp/greenmail.p12:/home/greenmail/greenmail.p12:ro \
             -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=test1:pwd1@example.com -Dgreenmail.users.login=email -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
             greenmail/standalone:2.1.15
