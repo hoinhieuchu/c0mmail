@@ -3,7 +3,7 @@ declare(strict_types=1);
 use App\Core\Auth;use App\Core\Config;use App\Core\Database;use App\Core\Router;use App\Core\View;
 use App\Controllers\AuthController;use App\Controllers\DashboardController;use App\Controllers\AdminMailboxController;use App\Controllers\WebmailController;
 use App\Providers\LocalSessionMemberProvider;use App\Providers\ManualMailProvider;use App\Providers\CraneMailProvider;
-use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Repositories\SendAttemptRepository;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
+use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Repositories\SendAttemptRepository;use App\Repositories\LoginRateLimitRepository;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
 require dirname(__DIR__).'/app/bootstrap.php';
 $config=Config::load(dirname(__DIR__).'/.env');
 $isProduction = $config->get('APP_ENV') === 'production';
