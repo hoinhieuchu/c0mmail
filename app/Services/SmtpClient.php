@@ -5,7 +5,7 @@ namespace App\Services;
 /** Authenticated SMTP client with mandatory TLS and RFC MIME message delivery. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = []): string
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = [], string $fromName = '', ?string $replyTo = null): string
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -15,7 +15,7 @@ final class SmtpClient
         if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
         if (!$recipients && !$ccRecipients && !$bccRecipients) throw new \InvalidArgumentException('At least one recipient is required.');
         $envelopeRecipients = array_values(array_unique(array_merge($recipients, $ccRecipients, $bccRecipients)));
-        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId, $ccRecipients, $bccRecipients);
+        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId, $ccRecipients, $bccRecipients, $fromName, $replyTo);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
         $context = stream_context_create(['ssl' => [
             'verify_peer' => true,
