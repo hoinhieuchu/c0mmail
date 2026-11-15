@@ -82,6 +82,41 @@ final class WebmailController
     }
 
 
+
+    public function downloadAttachment(): void
+    {
+        $user = $this->auth->requireLogin();
+        try {
+            $mailboxId = (int)($_GET['mailbox'] ?? 0);
+            $uid = (int)($_GET['uid'] ?? 0);
+            $folder = (string)($_GET['folder'] ?? 'INBOX');
+            $section = (string)($_GET['section'] ?? '');
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $message = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+            $attachment = null;
+            foreach ($message['attachments'] as $item) if ($item['section'] === $section) { $attachment = $item; break; }
+            if ($attachment === null) { http_response_code(404); exit('Attachment not found.'); }
+            if ((int)$attachment['size'] > 25_000_000) { http_response_code(413); exit('Attachment exceeds the 25 MB download limit.'); }
+            $data = $this->imap->fetchAttachment($context['settings'], $context['credentials'], $folder, $uid, $section, (int)$attachment['encoding']);
+            $filename = basename(str_replace('\\', '/', (string)$attachment['filename']));
+            $filename = preg_replace('/[\x00-\x1F\x7F]/', '_', $filename);
+            if ($filename === '' || $filename === '.' || $filename === '..') $filename = 'attachment.bin';
+            $fallback = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+            $mime = preg_match('#^[a-z0-9.+-]+/[a-z0-9.+-]+$#i', (string)$attachment['mime']) ? $attachment['mime'] : 'application/octet-stream';
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . strlen($data));
+            header("Content-Disposition: attachment; filename=\"{$fallback}\"; filename*=UTF-8''" . rawurlencode($filename));
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, max-age=0');
+            echo $data;
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Webmail attachment download failed: ' . $e->getMessage());
+            http_response_code(404);
+            exit('Attachment not found.');
+        }
+    }
+
     public function saveDraft(): void
     {
         $user = $this->auth->requireLogin();
