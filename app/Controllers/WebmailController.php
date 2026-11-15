@@ -111,7 +111,7 @@ final class WebmailController
             $this->assertPostBodyWithinLimit();
             Csrf::verify();
             if (!preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
-                throw new \\InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
+                throw new \InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
             }
 
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
@@ -122,8 +122,8 @@ final class WebmailController
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
             $attachments = $this->uploadedAttachments();
-            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \\InvalidArgumentException('Email subject or body is required.');
-            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \\InvalidArgumentException('Message exceeds the allowed size.');
+            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
 
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
             // Fingerprint every delivery-relevant field, including attachment bytes.
@@ -142,17 +142,17 @@ final class WebmailController
                 exit;
             }
             if ($status === 'sending') {
-                throw new \\RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
+                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
             }
             if ($status !== 'sending') {
-                throw new \\RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
+                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
             }
 
             $ownsSubmission = true;
             // The DB claim is committed before network I/O. A process crash leaves
             // a durable sending record which becomes uncertain, never retryable.
             if (session_status() === PHP_SESSION_ACTIVE && !session_write_close()) {
-                throw new \\RuntimeException('Unable to release the session before sending.');
+                throw new \RuntimeException('Unable to release the session before sending.');
             }
             $rawMessage = $this->smtp->send(
                 $context['settings'], $context['credentials'], $context['mailbox']['email'],
@@ -167,21 +167,21 @@ final class WebmailController
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
                 if ($sentFolder !== null) {
-                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\\\Seen');
+                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
                     $sentCopy = 'saved';
                 }
-            } catch (\\Throwable $saveError) {
+            } catch (\Throwable $saveError) {
                 $sentCopy = 'failed';
                 error_log('Sent-folder copy failed after SMTP accepted message.');
             }
             $this->sendAttempts->markSentCopy($submissionId, (int)$user['id'], $mailboxId, $sentFolder, $sentCopy);
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
             exit;
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
                 try {
                     $this->sendAttempts->markUncertain($submissionId, (int)$user['id'], $mailboxId);
-                } catch (\\Throwable $stateError) {
+                } catch (\Throwable $stateError) {
                     error_log('Unable to persist uncertain mail-send state: ' . get_class($stateError));
                 }
             }
