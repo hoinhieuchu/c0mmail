@@ -40,3 +40,5 @@
 - Global response headers include CSP, anti-framing, MIME sniffing protection, referrer policy, private no-store caching, and HSTS on HTTPS. Production PHP INI guidance disables displayed errors and enables server-side error logging. CSP-compatible UI behavior is delegated to the same-origin JavaScript asset; the public .user.ini is denied by Apache.
 
 - GitHub Actions runs the PHP unit suite on PHP 8.2–8.5. The PHP 8.5 matrix leg also runs protocol integration checks against an isolated GreenMail SMTP/IMAPS server with a trusted ephemeral TLS certificate; these checks validate the adapter contract, not the production CraneMail endpoint.
+
+- GreenMail integration revealed that ext-imap may expose MIME parameter collections as `stdClass` rather than arrays; `ImapClient` now normalizes array, Traversable, and object parameter groups before RFC 2231 decoding.

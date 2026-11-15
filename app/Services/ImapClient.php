@@ -330,9 +330,23 @@ final class ImapClient
         $parts[] = ['type' => $subtype, 'body' => $body];
     }
 
+    private function normalizeParameters($parameters): array
+    {
+        if (is_array($parameters)) return $parameters;
+        if ($parameters instanceof \Traversable) return array_values(iterator_to_array($parameters));
+        if (is_object($parameters)) {
+            if (isset($parameters->attribute)) return [$parameters];
+            return array_values(get_object_vars($parameters));
+        }
+        return [];
+    }
+
     private function partFilename($structure): string
     {
-        $parameters = array_merge($structure->parameters ?? [], $structure->dparameters ?? []);
+        $parameters = array_merge(
+            $this->normalizeParameters($structure->parameters ?? []),
+            $this->normalizeParameters($structure->dparameters ?? [])
+        );
         $values = [];
         $segments = ['filename' => [], 'name' => []];
 
