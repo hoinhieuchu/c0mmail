@@ -16,6 +16,10 @@ final class MimeMessageBuilder
             self::assertHeader((string)$recipient);
             if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
         }
+        if ($replyTo !== null && $replyTo !== '') {
+            self::assertHeader($replyTo);
+            if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid Reply-To address.');
+        }
         if (count($attachments) > 10) throw new \InvalidArgumentException('A maximum of 10 attachments is allowed.');
         $totalBytes = 0;
         foreach ($attachments as $attachment) {
