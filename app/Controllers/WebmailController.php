@@ -122,15 +122,15 @@ final class WebmailController
                 header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
                 exit;
             }
-            if (($submission['status'] ?? '') === 'sending') {
-                $startedAt = (int)($submission['started_at'] ?? 0);
-                if ($startedAt > 0 && (time() - $startedAt) > 120) {
-                    $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
-                    throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
-                }
+            $submissionStatus = \App\Services\SubmissionState::classify($submission);
+            if ($submissionStatus === 'sending') {
                 throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
             }
-            if (($submission['status'] ?? '') !== 'pending') {
+            if ($submissionStatus === 'uncertain') {
+                $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
+                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
+            }
+            if ($submissionStatus !== 'pending' && $submissionStatus !== 'accepted') {
                 throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
             }
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);

@@ -37,4 +37,9 @@ test('IMAP folder discovery strips the server connection prefix',function(){same
 test('IMAP folder names reject control characters and mailbox URL delimiters',function(){same('INBOX/Thư đến',\App\Services\ImapClient::validateFolderName('INBOX/Thư đến'));foreach (["INBOX\r\n{evil}",'{imap.example.test}','INBOX' . chr(0) . 'bad'] as $folder){try{\App\Services\ImapClient::validateFolderName($folder);throw new RuntimeException('Expected unsafe folder rejection');}catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'folder'));}}});
 
 test('webmail controller and transport services autoload',function(){same(true,class_exists(\App\Controllers\WebmailController::class));same(true,class_exists(\App\Services\ImapClient::class));same(true,class_exists(\App\Services\SmtpClient::class));same(true,class_exists(\App\Services\MimeMessageBuilder::class));});
+
+test('submission state keeps pending and accepted attempts stable',function(){same('pending',\App\Services\SubmissionState::classify(['status'=>'pending'],100));same('accepted',\App\Services\SubmissionState::classify(['status'=>'accepted'],100));});
+test('submission state rejects a fresh in-flight duplicate without expiring it',function(){same('sending',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],150));});
+test('submission state marks stale in-flight attempts uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],221));});
+test('submission state treats legacy or unknown states as uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending'],100));same('uncertain',\App\Services\SubmissionState::classify(['status'=>'unexpected'],100));});
 echo "{$count} tests passed.\n";
