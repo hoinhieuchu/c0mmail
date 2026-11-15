@@ -54,4 +54,13 @@ test('IMAP filename parser prefers RFC 2231 extended values over legacy names',f
 test('IMAP filename parser falls back to ordinary MIME filename parameters',function(){$method=new ReflectionMethod(\App\Services\ImapClient::class,'partFilename');$method->setAccessible(true);$structure=(object)['parameters'=>[(object)['attribute'=>'name','value'=>'legacy.txt']],'dparameters'=>[]];same('legacy.txt',$method->invoke(new \App\Services\ImapClient(),$structure));});
 
 test('IMAP filename parser accepts stdClass parameter collections from ext-imap',function(){$method=new ReflectionMethod(\App\Services\ImapClient::class,'partFilename');$method->setAccessible(true);$parameters=(object)['0'=>(object)['attribute'=>'filename','value'=>'object-shape.txt']];$structure=(object)['parameters'=>$parameters,'dparameters'=>(object)[]];same('object-shape.txt',$method->invoke(new \App\Services\ImapClient(),$structure));});
+test('MIME builder emits Cc but never exposes Bcc in message headers',function(){
+ $raw=\App\Services\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Hello','body',null,[],[],null,['copy@example.test'],['blind@example.test']);
+ same(true,str_contains($raw,'Cc: copy@example.test'));
+ same(false,str_contains($raw,'Bcc:'));
+});
+test('MIME builder validates recipients across To Cc and Bcc',function(){
+ try{\App\Services\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Hello','body',null,[],[],null,['bad-address'],[]);throw new RuntimeException('Expected validation');}
+ catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'recipient'));}
+});
 echo "{$count} tests passed.\n";
