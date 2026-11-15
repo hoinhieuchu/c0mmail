@@ -216,6 +216,77 @@ final class WebmailController
         }
     }
 
+    public function updates(): void
+    {
+        $this->auth->requireLogin();
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: private, no-store, max-age=0');
+
+        $now = time();
+        $lastCheck = (int)($_SESSION['webmail_sync_last_check'] ?? 0);
+        if ($now - $lastCheck < 30) {
+            http_response_code(429);
+            echo json_encode(['error' => 'Please wait before checking again.']);
+            exit;
+        }
+        $_SESSION['webmail_sync_last_check'] = $now;
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
+        try {
+            $mailboxId = (int)($_GET['mailbox'] ?? 0);
+            $folder = (string)($_GET['folder'] ?? 'INBOX');
+            $afterUid = (int)($_GET['after'] ?? 0);
+            $query = trim((string)($_GET['q'] ?? ''));
+            if ($mailboxId < 1 || $afterUid < 0 || strlen($query) > 200) {
+                throw new \InvalidArgumentException('Invalid synchronization request.');
+            }
+
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$this->auth->user()['id']);
+            $folderNames = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folderNames, true)) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Folder not found.']);
+                exit;
+            }
+
+            $uidValidity = $this->imap->uidValidity($context['settings'], $context['credentials'], $folder);
+            $requestedValidity = (int)($_GET['uidvalidity'] ?? 0);
+            if ($requestedValidity < 1 || $requestedValidity !== $uidValidity) {
+                echo json_encode(['reset_required' => true, 'uid_validity' => $uidValidity]);
+                exit;
+            }
+
+            $updates = $this->imap->listMessages(
+                $context['settings'],
+                $context['credentials'],
+                $folder,
+                21,
+                0,
+                $query !== '' ? $query : null,
+                null,
+                $afterUid > 0 ? $afterUid : null
+            );
+            $newCount = count($updates);
+            $latestUid = $updates
+                ? max(array_map(static fn(array $message): int => (int)$message['uid'], $updates))
+                : $afterUid;
+
+            echo json_encode([
+                'reset_required' => false,
+                'uid_validity' => $uidValidity,
+                'new_count' => min($newCount, 20),
+                'has_more' => $newCount > 20,
+                'latest_uid' => $latestUid,
+            ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Webmail sync check failed: ' . get_class($e));
+            http_response_code(503);
+            echo json_encode(['error' => 'Unable to check for new messages.']);
+            exit;
+        }
+    }
+
     public function downloadAttachment(): void
     {
         $user = $this->auth->requireLogin();
