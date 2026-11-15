@@ -11,7 +11,7 @@
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (51 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (53 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
@@ -56,3 +56,5 @@
 - Webmail sync uses an authenticated GET endpoint at `/mail/updates`, polled every 90 seconds only while the browser page is visible. It checks the selected folder's UIDVALIDITY and UIDs newer than the latest displayed message, is throttled to one check per session every 30 seconds, and only presents a manual refresh link. It must not auto-reload because compose fields may contain unsaved content. This is polling, not IMAP IDLE/push.
 
 - Rich-text composition uses a contenteditable editor with basic bold/italic/underline/list/link controls. The submitted HTML is always sanitized in `MimeMessageBuilder` using a DOM allow-list: no scripts, styles, event attributes, embedded media, or unsafe URL schemes; only basic semantic formatting and HTTP(S)/mailto links survive. If DOM/XML is unavailable, the sanitizer safely degrades to escaped plain text. Tests cover sanitizer behavior and MIME output.
+
+- Rich-text composition is enabled with a contenteditable editor and basic formatting toolbar. All outbound HTML passes through `HtmlEmailSanitizer` in `MimeMessageBuilder`; allow-list tags only, no script/style/event attributes/embedded media, HTTP(S)/mailto links only, and safe escaped-text fallback when DOM/XML is unavailable. On send/draft errors, the controller restores the form values and sanitized HTML while retaining the original submission token, so uncertain delivery cannot accidentally get a new retry token.
