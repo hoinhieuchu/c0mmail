@@ -119,10 +119,27 @@ final class MimeMessageBuilder
 
     private static function encodeHeader(string $value): string
     {
-        if (function_exists('mb_encode_mimeheader')) return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
-        $chunks = str_split(base64_encode($value), 48);
+        if ($value === '') return '';
+        if (function_exists('mb_encode_mimeheader')) {
+            return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
+        }
+
+        // RFC 2047 encoded-words must stay within 75 octets. Split the source
+        // at UTF-8 character boundaries so each independently decoded word is valid.
+        $characters = preg_split('//u', $value, -1, PREG_SPLIT_NO_EMPTY);
+        if ($characters === false) throw new \\InvalidArgumentException('Header text must be valid UTF-8.');
+        $chunks = [];
+        $chunk = '';
+        foreach ($characters as $character) {
+            if (strlen($chunk) + strlen($character) > 45 && $chunk !== '') {
+                $chunks[] = $chunk;
+                $chunk = '';
+            }
+            $chunk .= $character;
+        }
+        if ($chunk !== '') $chunks[] = $chunk;
         return implode("\r\n ", array_map(
-            static fn(string $chunk): string => '=?UTF-8?B?' . $chunk . '?=',
+            static fn(string $part): string => '=?UTF-8?B?' . base64_encode($part) . '?=',
             $chunks
         ));
     }
