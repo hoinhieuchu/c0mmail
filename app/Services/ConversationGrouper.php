@@ -35,6 +35,8 @@ final class ConversationGrouper
             usort($items, static fn(array $a, array $b): int => (int)($b['uid'] ?? 0) <=> (int)($a['uid'] ?? 0));
             $latest = $items[0];
             $latest['thread_count'] = count($items);
+            $latest['seen'] = count(array_filter($items, static fn(array $item): bool => empty($item['seen']))) === 0;
+            $latest['flagged'] = count(array_filter($items, static fn(array $item): bool => !empty($item['flagged']))) > 0;
             $latest['thread_uids'] = array_values(array_map(static fn(array $item): int => (int)$item['uid'], $items));
             $latest['thread_items'] = array_map(static fn(array $item): array => [
                 'uid' => (int)($item['uid'] ?? 0),
