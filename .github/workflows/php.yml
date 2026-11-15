@@ -18,6 +18,8 @@ jobs:
           extensions: pdo_mysql, openssl, imap, fileinfo
       - name: PHP syntax check
         run: find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: JavaScript syntax check
+        run: node --check public/assets/webmail-sync.js
       - name: Automated tests
         run: php tests/run.php
       - name: Start GreenMail TLS test server
