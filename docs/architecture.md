@@ -33,6 +33,7 @@ Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_
 
 ## Webmail transport
 
+- Webmail performs a lightweight authenticated IMAP polling check every 90 seconds while visible, scoped to the selected folder's UIDVALIDITY and latest UID. The endpoint is session-throttled and never forces a page reload, preserving unsent compose content. This is not a persistent IMAP IDLE connection.
 - `ImapClient` uses PHP's IMAP extension and the configured IMAP host, port, and encryption mode. It discovers server folders, lists messages by UID with server-side TEXT search and UID-cursor pagination scoped to UIDVALIDITY, reads text/plain (or text/html fallback) bodies, marks opened messages as seen, supports explicit read/unread and flagged/star states, appends Sent/Drafts messages, and moves messages by UID.
 - `SmtpClient` uses authenticated SMTP over implicit TLS or STARTTLS. `MimeMessageBuilder` constructs RFC 5322 multipart messages with UTF-8 plain text, optional HTML alternatives, base64 attachments, and validated In-Reply-To/References headers. The exact generated message is reused for SMTP delivery and the Sent IMAP copy; Drafts use the same builder.
 - Mailbox credentials are decrypted only after the authenticated user is verified as the mailbox owner and the mailbox is active. Credentials are never returned to templates or browser JavaScript.
