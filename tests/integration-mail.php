@@ -34,8 +34,11 @@ $prefix = '{localhost:3993/imap/ssl}';
 $stream = @imap_open($prefix . 'INBOX', $credentials['email'], $credentials['password'], 0);
 if ($stream === false) throw new RuntimeException('Unable to open GreenMail IMAP session for folder setup.');
 try {
+    $existing = imap_getmailboxes($stream, $prefix, '*') ?: [];
+    $existingNames = array_map(static fn($item): string => (string)$item->name, $existing);
     foreach (['Sent', 'Drafts', 'Trash'] as $folder) {
-        if (!@imap_createmailbox($stream, $prefix . $folder)) {
+        if (!in_array($prefix . $folder, $existingNames, true)
+            && !@imap_createmailbox($stream, $prefix . $folder)) {
             throw new RuntimeException('Unable to create GreenMail test folder: ' . $folder . ' (' . (imap_last_error() ?: 'unknown error') . ')');
         }
     }
