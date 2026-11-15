@@ -44,7 +44,7 @@ jobs:
           docker run -d --name greenmail \
             -p 3465:3465 -p 3993:3993 \
             -v /tmp/greenmail.p12:/home/greenmail/greenmail.p12:ro \
-            -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=test1:pwd1@localhost -Dgreenmail.users.login=email -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
+            -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=test1:pwd1@example.com -Dgreenmail.users.login=email -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
             greenmail/standalone:2.1.15
           ready=0
           for attempt in $(seq 1 15); do

@@ -20,7 +20,7 @@ $settings = [
     'smtp_port' => 3465,
     'smtp_encryption' => 'ssl',
 ];
-$credentials = ['email' => 'test1@localhost', 'password' => 'pwd1'];
+$credentials = ['email' => 'test1@example.com', 'password' => 'pwd1'];
 $imap = new ImapClient();
 $smtp = new SmtpClient();
 
