@@ -8,7 +8,7 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 - Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
 - Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
 - Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
-- Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read-state updates, server-side text search, 50-message pagination, and moving messages to Trash/Spam folders when available.
+- Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read-state updates, server-side text search, 50-message pagination, downloading attachments, and moving messages to Trash/Spam folders when available.
 - SMTP sending with authenticated SSL/STARTTLS transport, plain-text and HTML alternatives, and multiple MIME attachments; sent messages are copied to the server's Sent folder when that folder is exposed.
 - Draft saving to the server's Drafts folder when available.
 - SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
