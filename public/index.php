@@ -37,7 +37,7 @@ $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
-$service=new MailboxService($mailboxes,$provider,$config);$loginLimits=new LoginRateLimitRepository($db,$config->required('APP_KEY'));$authController=new AuthController($users,$loginLimits,$view);$webmail=new WebmailController($auth,$mailboxes,$service,new ImapClient(),new SmtpClient(),$view,$sendAttempts);
+$service=new MailboxService($mailboxes,$provider,$config);$loginLimits=new LoginRateLimitRepository($db,$config->required('APP_KEY'));$trustedProxyCidrs=array_values(array_filter(array_map('trim',explode(',',(string)$config->get('APP_TRUSTED_PROXY_CIDRS','')))));$authController=new AuthController($users,$loginLimits,$view,$trustedProxyCidrs);$webmail=new WebmailController($auth,$mailboxes,$service,new ImapClient(),new SmtpClient(),$view,$sendAttempts);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
 $admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $router=new Router();
