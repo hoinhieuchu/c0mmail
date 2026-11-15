@@ -2,7 +2,7 @@
 declare(strict_types=1);
 namespace App\Services;
 
-/** Minimal authenticated SMTP client with STARTTLS/implicit TLS and MIME text bodies. */
+/** Authenticated SMTP client with mandatory TLS and RFC MIME message delivery. */
 final class SmtpClient
 {
     public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = []): string
