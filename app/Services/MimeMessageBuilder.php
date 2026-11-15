@@ -38,7 +38,7 @@ final class MimeMessageBuilder
             $value = trim((string)($threadHeaders[$key] ?? ''));
             if ($value !== '') {
                 self::assertHeader($value);
-                if (strlen($value) > 998) throw new \\InvalidArgumentException('Thread header exceeds the allowed length.');
+                if (strlen($value) > 998) throw new \InvalidArgumentException('Thread header exceeds the allowed length.');
                 $headers[] = $headerName . ': ' . $value;
             }
         }
