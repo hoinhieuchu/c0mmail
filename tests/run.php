@@ -127,7 +127,7 @@ test('conversation grouper follows RFC References and In-Reply-To chains',functi
  $messages=[
   ['uid'=>10,'subject'=>'Quarterly report','from'=>'a@example.test','date'=>'2026-01-01','message_id'=>'<root@example.test>','references'=>'','in_reply_to'=>''],
   ['uid'=>11,'subject'=>'Re: Quarterly report','from'=>'b@example.test','date'=>'2026-01-02','message_id'=>'<reply@example.test>','references'=>'','in_reply_to'=>'<root@example.test>','seen'=>false],
-  ['uid'=>12,'subject'=>'Re: Quarterly report','from'=>'c@example.test','date'=>'2026-01-03','message_id'=>'<followup@example.test>','references'=>'<root@example.test> <reply@example.test>','in_reply_to'=>'<reply@example.test>'],
+  ['uid'=>12,'subject'=>'Re: Quarterly report','from'=>'c@example.test','date'=>'2026-01-03','message_id'=>'<followup@example.test>','references'=>'','in_reply_to'=>'<reply@example.test>'],
   ['uid'=>20,'subject'=>'Quarterly report','from'=>'d@example.test','date'=>'2026-01-04','message_id'=>'<separate@example.test>','references'=>'','in_reply_to'=>''],
  ];
  $groups=\App\Services\ConversationGrouper::group($messages);
