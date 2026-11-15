@@ -6,6 +6,7 @@ use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\View;
 use App\Repositories\MailboxRepository;
+use App\Repositories\SendAttemptRepository;
 use App\Services\ImapClient;
 use App\Services\MailboxService;
 use App\Services\MimeMessageBuilder;
