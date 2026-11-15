@@ -81,7 +81,7 @@ try {
 
     $expiredToken = bin2hex(random_bytes(16));
     $repo->createPending($expiredToken, $userId, $mailboxId);
-    $expire = $db->prepare("UPDATE mail_send_attempts SET created_at=DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 31 DAY) WHERE submission_id=?");
+    $expire = $db->prepare("UPDATE mail_send_attempts SET created_at=DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 2 DAY) WHERE submission_id=?");
     $expire->execute([$expiredToken]);
     $repo->createPending(bin2hex(random_bytes(16)), $userId, $mailboxId);
     $check($repo->find($expiredToken, $userId, $mailboxId) === null, 'old send-attempt records are purged during compose-token creation');
