@@ -65,11 +65,47 @@ final class WebmailController
             if ($subject === '' && trim($body) === '') throw new \InvalidArgumentException('Email subject or body is required.');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \InvalidArgumentException('Message exceeds the allowed size.');
             $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body);
-            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode((string)($_POST['sent_folder'] ?? 'Sent')) . '&sent=1');
+            try {
+                $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
+                if ($sentFolder !== null) $this->imap->appendTextMessage($context['settings'], $context['credentials'], $sentFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\\\\Seen');
+            } catch (\\Throwable $saveError) { error_log('Sent-folder copy failed after SMTP accepted message: ' . $saveError->getMessage()); }
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1');
             exit;
         } catch (\Throwable $e) {
             $this->indexWithError($user, $e->getMessage());
         }
+    }
+
+
+    public function saveDraft(): void
+    {
+        $user = $this->auth->requireLogin();
+        Csrf::verify();
+        try {
+            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $to = preg_split('/[,;]+/', (string)($_POST['to'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $recipients = array_values(array_unique(array_filter(array_map('trim', $to), static fn(string $v): bool => filter_var($v, FILTER_VALIDATE_EMAIL) !== false)));
+            $subject = trim((string)($_POST['subject'] ?? ''));
+            $body = (string)($_POST['body'] ?? '');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \\InvalidArgumentException('Draft exceeds the allowed size.');
+            $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
+            if ($draftFolder === null) throw new \\RuntimeException('The IMAP server does not expose a Drafts folder.');
+            $this->imap->appendTextMessage($context['settings'], $context['credentials'], $draftFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\\\\Draft');
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
+            exit;
+        } catch (\\Throwable $e) { $this->indexWithError($user, $e->getMessage()); }
+    }
+
+    private function findFolder(array $folders, array $candidates): ?string
+    {
+        foreach ($folders as $folder) {
+            $name = strtolower((string)$folder['name']);
+            foreach ($candidates as $candidate) {
+                if ($name === $candidate || str_ends_with($name, '.' . $candidate)) return (string)$folder['name'];
+            }
+        }
+        return null;
     }
 
     public function move(): void
