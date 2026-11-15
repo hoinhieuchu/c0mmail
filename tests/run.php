@@ -160,4 +160,16 @@ test('MIME builder sanitizes HTML before sending and archiving',function(){
  same(false,str_contains(strtolower($raw),'onclick'));
  same(true,str_contains($raw,'<p>safe</p>'));
 });
+
+test('client IP resolver ignores forwarding headers from untrusted peers',function(){
+ same('203.0.113.10',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_CONNECTING_IP'=>'198.51.100.20'],[]));
+});
+test('client IP resolver accepts Cloudflare client IP only from trusted proxy CIDRs',function(){
+ same('198.51.100.20',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_CONNECTING_IP'=>'198.51.100.20'],['203.0.113.0/24']));
+ same('203.0.113.10',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_CONNECTING_IP'=>'198.51.100.20'],['192.0.2.0/24']));
+});
+test('client IP resolver supports trusted IPv6 proxies and rejects invalid CIDRs',function(){
+ same('2001:db8::20',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'2001:db8::10','HTTP_X_REAL_IP'=>'2001:db8::20'],['2001:db8::/32']));
+ same('2001:db8::10',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'2001:db8::10','HTTP_X_REAL_IP'=>'2001:db8::20'],['not-a-cidr']));
+});
 echo "{$count} tests passed.\n";
