@@ -17,7 +17,7 @@ The application is a webmail client and mailbox-management layer; it does not ru
 
 ## Requirements
 
-PHP 8.1+, PDO MySQL, OpenSSL, JSON, sessions, and the PHP IMAP extension (`ext-imap`) for browser webmail. MariaDB 10.5+ or MySQL 8+. cURL is optional.
+PHP 8.1+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extension (`ext-imap`) for browser webmail and attachment uploads. MariaDB 10.5+ or MySQL 8+. cURL is optional.
 
 ## Quick start
 
