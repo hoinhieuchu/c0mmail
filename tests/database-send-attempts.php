@@ -42,7 +42,7 @@ $check = static function (bool $ok, string $message): void {
 try {
     for ($i = 0; $i < 10; $i++) $loginLimits->recordFailure('blocked@example.test', '192.0.2.10');
     $check($loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'repeated password failures block the account key');
-    $loginLimits->clear('blocked@example.test', '192.0.2.10');
+    $loginLimits->clearAccount('blocked@example.test');
     $check(!$loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'successful authentication clears the account throttle');
 
     for ($i = 0; $i < 20; $i++) $loginLimits->recordFailure('other-' . $i . '@example.test', '192.0.2.10');
