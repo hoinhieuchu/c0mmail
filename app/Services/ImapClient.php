@@ -15,7 +15,7 @@ final class ImapClient
         $query = trim((string)$query);
         if ($query === '') return 'ALL';
         if (strlen($query) > 200 || preg_match('/[\\x00-\\x1F\\x7F]/', $query)) {
-            throw new \\InvalidArgumentException('Search query contains unsupported characters.');
+            throw new \InvalidArgumentException('Search query contains unsupported characters.');
         }
         return 'TEXT "' . addcslashes($query, "\\\\"") . '"';
     }
