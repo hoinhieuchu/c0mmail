@@ -4,7 +4,7 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 
 ## Implemented foundation
 
-- Local account authentication, role-based admin access, CSRF protection, and session ID rotation. Login attempts are throttled persistently by account and IP.
+- Local account authentication, role-based admin access, CSRF protection, and session ID rotation. Login attempts are throttled persistently by account and client IP; forwarded IP headers are accepted only from explicitly configured trusted proxy CIDRs.
 - Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
 - Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
 - Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
