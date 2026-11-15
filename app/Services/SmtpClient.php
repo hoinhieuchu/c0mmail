@@ -51,6 +51,15 @@ final class SmtpClient
             try { $this->command($socket, 'QUIT', [221]); }
             catch (\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance.'); }
             return $message;
+        } catch (SmtpProtocolException $e) {
+            $uncertain = $phase === 'data' && !$e->isNegativeReply();
+            throw new SmtpDeliveryException(
+                $uncertain
+                    ? 'SMTP response was inconclusive after message DATA was submitted.'
+                    : 'SMTP server rejected the operation.',
+                $uncertain,
+                $e
+            );
         } catch (SmtpDeliveryException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -95,7 +104,9 @@ final class SmtpClient
             $response .= $line;
         } while (isset($line[3]) && $line[3] === '-');
         $code = (int)substr($response, 0, 3);
-        if (!in_array($code, $expected, true)) throw new \RuntimeException('SMTP server rejected the operation (code ' . $code . ').');
+        if (!in_array($code, $expected, true)) {
+            throw new SmtpProtocolException('SMTP server returned an unexpected response.', $code);
+        }
         return $response;
     }
 
