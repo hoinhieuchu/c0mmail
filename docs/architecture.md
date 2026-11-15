@@ -10,6 +10,10 @@
 - `app/Contracts`: replaceable identity and mail-provider contracts.
 - `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
 
+## Authentication and proxy trust
+
+Login failures are throttled by HMAC keys for normalized account and client IP. `ClientIpResolver` trusts `REMOTE_ADDR` by default; it only accepts `CF-Connecting-IP` or `X-Real-IP` when the immediate peer matches an explicitly configured `APP_TRUSTED_PROXY_CIDRS` entry. `X-Forwarded-For` is not used. Configure only the actual reverse-proxy CIDRs.
+
 ## Identity adapter
 
 Controllers obtain the current principal through `MemberProviderInterface`. The shipped `LocalSessionMemberProvider` reads the authenticated local account from the database. A future OIDC implementation should validate issuer, audience, signature, state, nonce, and PKCE, then map the verified subject to a local member. No Account Center endpoints or SSO assumptions are embedded.
