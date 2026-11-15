@@ -134,9 +134,9 @@ final class WebmailController
                 throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
             }
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
-            $rawTo = (string)($_POST['to'] ?? '');
-            $recipients = preg_split('/[,;]+/', $rawTo, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $recipients = array_values(array_unique(array_map('trim', $recipients)));
+            $recipients = $this->parseRecipients((string)($_POST['to'] ?? ''), 'To');
+            $ccRecipients = $this->parseRecipients((string)($_POST['cc'] ?? ''), 'Cc');
+            $bccRecipients = $this->parseRecipients((string)($_POST['bcc'] ?? ''), 'Bcc');
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
@@ -154,7 +154,7 @@ final class WebmailController
                 throw new \RuntimeException('Unable to persist the send attempt state.');
             }
             $messageId = '<' . $submissionId . '@c0m.me>';
-            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId);
+            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId, $ccRecipients, $bccRecipients);
             // Persist acceptance before attempting the optional Sent-folder APPEND.
             // If APPEND or the worker fails, a retry must not send the email again.
             if (session_status() !== PHP_SESSION_ACTIVE && !session_start()) {
@@ -240,8 +240,9 @@ final class WebmailController
             Csrf::verify();
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
-            $to = preg_split('/[,;]+/', (string)($_POST['to'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $recipients = array_values(array_unique(array_map('trim', $to)));
+            $recipients = $this->parseRecipients((string)($_POST['to'] ?? ''), 'To');
+            $ccRecipients = $this->parseRecipients((string)($_POST['cc'] ?? ''), 'Cc');
+            $bccRecipients = $this->parseRecipients((string)($_POST['bcc'] ?? ''), 'Bcc');
             foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid draft recipient address.');
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
@@ -251,7 +252,7 @@ final class WebmailController
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
             if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
-            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders);
+            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, null, $ccRecipients, $bccRecipients);
             $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
@@ -259,6 +260,19 @@ final class WebmailController
             error_log('Webmail draft save failed: ' . get_class($e));
             $this->indexWithError($user, $this->userFacingError($e));
         }
+    }
+
+    private function parseRecipients(string $input, string $field): array
+    {
+        $parts = preg_split('/[,;]+/', $input, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $recipients = array_values(array_unique(array_map('trim', $parts)));
+        foreach ($recipients as $recipient) {
+            if ($recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('Invalid ' . $field . ' recipient address.');
+            }
+        }
+        if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
+        return $recipients;
     }
 
     private function findFolder(array $folders, array $candidates): ?string
