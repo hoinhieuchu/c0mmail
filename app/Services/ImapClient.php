@@ -27,12 +27,10 @@ final class ImapClient
 
     public static function normalizeSearchResult($result, array $errors = []): array
     {
-        if ($result === false) {
-            if ($errors !== []) {
-                throw new \RuntimeException('IMAP search failed: ' . implode('; ', array_map('strval', $errors)));
-            }
-            return [];
+        if ($errors !== []) {
+            throw new \RuntimeException('IMAP search failed: ' . implode('; ', array_map('strval', $errors)));
         }
+        if ($result === false) return [];
         if (!is_array($result)) throw new \RuntimeException('IMAP search returned an invalid response.');
         return array_values(array_map('intval', $result));
     }
