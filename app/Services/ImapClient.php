@@ -30,7 +30,9 @@ final class ImapClient
             if ($items === false) throw new \RuntimeException('Unable to list IMAP folders.');
             $folders = [];
             foreach ($items as $item) {
-                $name = function_exists('imap_utf7_decode') ? imap_utf7_decode($item->name) : $item->name;
+                $rawName = (string)$item->name;
+                if (str_starts_with($rawName, $prefix)) $rawName = substr($rawName, strlen($prefix));
+                $name = function_exists('imap_utf7_decode') ? imap_utf7_decode($rawName) : $rawName;
                 $folders[] = ['name' => $name, 'delimiter' => $item->delimiter ?? '/'];
             }
             return $folders;
