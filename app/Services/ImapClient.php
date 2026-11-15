@@ -10,6 +10,11 @@ final class ImapClient
     public function available(): bool { return function_exists('imap_open'); }
 
 
+    public static function stripServerPrefix(string $name, string $prefix): string
+    {
+        return str_starts_with($name, $prefix) ? substr($name, strlen($prefix)) : $name;
+    }
+
     public static function buildSearchCriteria(?string $query): string
     {
         $query = trim((string)$query);
@@ -31,7 +36,7 @@ final class ImapClient
             $folders = [];
             foreach ($items as $item) {
                 $rawName = (string)$item->name;
-                if (str_starts_with($rawName, $prefix)) $rawName = substr($rawName, strlen($prefix));
+                $rawName = self::stripServerPrefix($rawName, $prefix);
                 $name = function_exists('imap_utf7_decode') ? imap_utf7_decode($rawName) : $rawName;
                 $folders[] = ['name' => $name, 'delimiter' => $item->delimiter ?? '/'];
             }
