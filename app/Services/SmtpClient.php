@@ -35,8 +35,8 @@ final class SmtpClient
             $this->command($socket, 'MAIL FROM:<' . $from . '>', [250]);
             foreach (array_unique($recipients) as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
-            $message = preg_replace('/(?m)^\\./', '..', str_replace(["\\r\\n", "\\r"], "\\n", $message));
-            fwrite($socket, str_replace("\\n", "\\r\\n", $message) . "\\r\\n.\\r\\n");
+            $message = preg_replace('/(?m)^\./', '..', str_replace(["\r\n", "\r"], "\n", $message));
+            fwrite($socket, str_replace("\n", "\r\n", $message) . "\r\n.\r\n");
             $this->expect($socket, [250]);
             $this->command($socket, 'QUIT', [221]);
         } finally { fclose($socket); }
