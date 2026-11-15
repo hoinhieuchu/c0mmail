@@ -83,10 +83,10 @@ test('SMTP delivery exception exposes whether remote acceptance is uncertain',fu
  same(true,$uncertain->deliveryUncertain);
 });
 test('IMAP message retrieval enforces the 40 MB size boundary',function(){
- \\App\\Services\\ImapClient::validateMessageSize(0);
- \\App\\Services\\ImapClient::validateMessageSize(40_000_000);
+ \App\Services\ImapClient::validateMessageSize(0);
+ \App\Services\ImapClient::validateMessageSize(40_000_000);
  foreach ([-1,40_000_001] as $bytes) {
-  try{\\App\\Services\\ImapClient::validateMessageSize($bytes);throw new RuntimeException('Expected message size rejection');}
+  try{\App\Services\ImapClient::validateMessageSize($bytes);throw new RuntimeException('Expected message size rejection');}
   catch(RuntimeException $e){same(true,str_contains($e->getMessage(),'40 MB'));}
  }
 });
