@@ -5,7 +5,7 @@ namespace App\Services;
 /** Minimal authenticated SMTP client with STARTTLS/implicit TLS and MIME text bodies. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body): void
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = []): void
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -13,13 +13,8 @@ final class SmtpClient
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('SMTP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid SMTP port.');
         if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
-        if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
         if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
-        foreach ($recipients as $recipient) {
-            if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
-        }
-        $this->assertHeader($from);
-        $this->assertHeader($subject);
+        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
         $socket = @stream_socket_client($target, $errno, $error, 20, STREAM_CLIENT_CONNECT);
         if (!$socket) throw new \RuntimeException('SMTP connection failed: ' . $error . ' (' . $errno . ').');
@@ -40,19 +35,8 @@ final class SmtpClient
             $this->command($socket, 'MAIL FROM:<' . $from . '>', [250]);
             foreach (array_unique($recipients) as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
-            $headers = [
-                'From: ' . $from,
-                'To: ' . implode(', ', array_unique($recipients)),
-                'Subject: ' . $this->encodeHeader($subject),
-                'Date: ' . date(DATE_RFC2822),
-                'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
-                'MIME-Version: 1.0',
-                'Content-Type: text/plain; charset=UTF-8',
-                'Content-Transfer-Encoding: quoted-printable',
-            ];
-            $message = implode("\r\n", $headers) . "\r\n\r\n" . quoted_printable_encode(str_replace(["\r\n", "\r"], "\n", $body));
-            $message = preg_replace('/(?m)^\./', '..', str_replace(["\r\n", "\r"], "\n", $message));
-            fwrite($socket, str_replace("\n", "\r\n", $message) . "\r\n.\r\n");
+            $message = preg_replace('/(?m)^\\./', '..', str_replace(["\\r\\n", "\\r"], "\\n", $message));
+            fwrite($socket, str_replace("\\n", "\\r\\n", $message) . "\\r\\n.\\r\\n");
             $this->expect($socket, [250]);
             $this->command($socket, 'QUIT', [221]);
         } finally { fclose($socket); }
@@ -77,14 +61,4 @@ final class SmtpClient
         return $response;
     }
 
-    private function assertHeader(string $value): void
-    {
-        if ($value === '' || preg_match('/[\r\n\0]/', $value)) throw new \InvalidArgumentException('Invalid email header value.');
-    }
-
-    private function encodeHeader(string $value): string
-    {
-        if (function_exists('mb_encode_mimeheader')) return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
-        return '=?UTF-8?B?' . base64_encode($value) . '?=';
-    }
 }
