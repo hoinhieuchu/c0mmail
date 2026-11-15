@@ -40,20 +40,20 @@ jobs:
             greenmail/standalone:2.1.15
           ready=0
           for attempt in $(seq 1 60); do
-            if (echo > /dev/tcp/127.0.0.1/3465) 2>/dev/null && (echo > /dev/tcp/127.0.0.1/3993) 2>/dev/null; then
+            if timeout 5 openssl s_client -connect 127.0.0.1:3993 -servername localhost \
+                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-imaps.log 2>&1 \
+              && timeout 5 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
+                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1; then
               ready=1
               break
             fi
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
+            cat /tmp/greenmail-imaps.log /tmp/greenmail-smtps.log || true
             docker logs greenmail
             exit 1
           fi
-          openssl s_client -connect 127.0.0.1:3993 -servername localhost \
-            -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null
-          openssl s_client -connect 127.0.0.1:3465 -servername localhost \
-            -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null
       - name: IMAP/SMTP integration tests
         if: matrix.php-version == '8.5'
         env:
