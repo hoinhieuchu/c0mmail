@@ -29,7 +29,7 @@ final class SmtpClient
                 $this->command($socket, 'STARTTLS', [220]);
                 if (!stream_socket_enable_crypto($socket, true, STREAM_CRYPTO_METHOD_TLS_CLIENT)) throw new \RuntimeException('SMTP STARTTLS negotiation failed.');
                 $this->command($socket, 'EHLO c0m.me', [250]);
-            } elseif ($mode !== 'ssl' && $mode !== 'none') {
+            } elseif ($mode !== 'ssl') {
                 throw new \RuntimeException('Unsupported SMTP encryption mode.');
             }
             $this->command($socket, 'AUTH LOGIN', [334]);
@@ -39,8 +39,8 @@ final class SmtpClient
             foreach (array_unique($recipients) as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
             $headers = [
-                'From: ' . $this->encodeHeader($from),
-                'To: ' . implode(', ', array_map([$this, 'encodeHeader'], array_unique($recipients))),
+                'From: ' . $from,
+                'To: ' . implode(', ', array_unique($recipients)),
                 'Subject: ' . $this->encodeHeader($subject),
                 'Date: ' . date(DATE_RFC2822),
                 'Message-ID: <' . bin2hex(random_bytes(16)) . '@c0m.me>',
