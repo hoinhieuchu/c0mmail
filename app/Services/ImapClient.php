@@ -99,13 +99,13 @@ final class ImapClient
 
     public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50, int $offset = 0, ?string $query = null, ?int $beforeUid = null, ?int $afterUid = null): array
     {
+        if ($beforeUid !== null && $beforeUid < 2) return [];
         $this->requireExtension();
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
             if ($offset < 0) throw new \InvalidArgumentException('Invalid message offset.');
             $limit = max(1, min(101, $limit));
             $criteria = self::buildUidSearchCriteria($query, $beforeUid, $afterUid);
-            if ($beforeUid !== null && $beforeUid < 2) return [];
             imap_errors();
             $uids = imap_search($stream, $criteria, SE_UID, 'UTF-8');
             $uids = self::normalizeSearchResult($uids, imap_errors() ?: []);
