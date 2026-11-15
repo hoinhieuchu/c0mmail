@@ -8,6 +8,7 @@ use App\Core\View;
 use App\Repositories\MailboxRepository;
 use App\Services\ImapClient;
 use App\Services\MailboxService;
+use App\Services\MimeMessageBuilder;
 use App\Services\SmtpClient;
 
 final class WebmailController
@@ -74,7 +75,7 @@ final class WebmailController
             $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments);
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
-                if ($sentFolder !== null) $this->imap->appendTextMessage($context['settings'], $context['credentials'], $sentFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Seen', $htmlBody, $attachments);
+                if ($sentFolder !== null) $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
             } catch (\Throwable $saveError) { error_log('Sent-folder copy failed after SMTP accepted message: ' . $saveError->getMessage()); }
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1');
             exit;
@@ -136,7 +137,8 @@ final class WebmailController
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
             if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
-            $this->imap->appendTextMessage($context['settings'], $context['credentials'], $draftFolder, $context['mailbox']['email'], $recipients, $subject, $body, '\Draft', $htmlBody, $attachments);
+            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments);
+            $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
         } catch (\Throwable $e) { $this->indexWithError($user, $e->getMessage()); }
