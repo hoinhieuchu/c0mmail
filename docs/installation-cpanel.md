@@ -3,7 +3,7 @@
 1. Create a MySQL database and database user in cPanel, then grant all required privileges.
 2. Upload the repository to a directory outside `public_html` when possible.
 3. Set the domain/subdomain document root to the repository's `public/` directory. If your hosting plan cannot change document root, copy only the contents of `public/` into `public_html/` and adjust the bootstrap path in `public/index.php`; keep `app/`, `database/`, `bin/`, `.env`, and `storage/` outside the web root.
-4. Copy `.env.example` to `.env`; set database values, `APP_URL`, a random key, and mail connection values from CraneMail.
+4. Copy `.env.example` to `.env`; set database values, `APP_URL`, a random key, and mail connection values from CraneMail. If the site is behind a reverse proxy, set `APP_TRUSTED_PROXY_CIDRS` to the proxy's exact IPv4/IPv6 CIDR ranges; do not trust forwarded client-IP headers from unlisted peers.
 5. Generate an application key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
 6. Import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql` and `database/migrations/003_send_attempt_failed_state.sql` and `database/migrations/004_login_rate_limits.sql`, using phpMyAdmin. All four migrations are required for the current webmail release.
 7. Run the administrator bootstrap from Terminal/SSH: `php bin/create-admin.php admin@example.com 'minimum-14-character-password'`. Use `bin/create-member.php` for member accounts.
