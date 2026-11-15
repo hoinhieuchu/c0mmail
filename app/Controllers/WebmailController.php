@@ -8,6 +8,7 @@ use App\Core\View;
 use App\Repositories\MailboxRepository;
 use App\Repositories\SendAttemptRepository;
 use App\Services\ImapClient;
+use App\Services\ConversationGrouper;
 use App\Services\MailboxService;
 use App\Services\MimeMessageBuilder;
 use App\Services\SmtpClient;
@@ -69,9 +70,20 @@ final class WebmailController
             );
             $hasMore = count($messages) > 50;
             $messages = array_slice($messages, 0, 50);
+            $oldestUid = $messages ? min(array_map(static fn(array $message): int => (int)$message['uid'], $messages)) : 0;
+            $messages = ConversationGrouper::group($messages);
             $selected = null;
+            $relatedMessages = [];
             $uid = (int)($_GET['uid'] ?? 0);
-            if ($uid > 0) $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+            if ($uid > 0) {
+                $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+                foreach ($messages as $thread) {
+                    if (in_array($uid, $thread['thread_uids'] ?? [], true)) {
+                        $relatedMessages = $thread['thread_items'] ?? [];
+                        break;
+                    }
+                }
+            }
             $compose = ['to'=>'','cc'=>'','bcc'=>'','reply_to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''];
             $composeMode = (string)($_GET['compose'] ?? '');
             if ($selected && in_array($composeMode, ['reply', 'forward'], true)) {
@@ -95,7 +107,7 @@ final class WebmailController
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
                 'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
-                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'compose'=>$compose,
+                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'oldestUid'=>$oldestUid,'relatedMessages'=>$relatedMessages,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
             error_log('Webmail mailbox view failed: ' . get_class($e));
