@@ -9,11 +9,11 @@ Lightweight PHP MVC mail-account management application for cPanel/shared hostin
 - Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
 - Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
 - Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read/unread and star flags, server-side text search, 50-message pagination, downloading attachments, and moving messages to Trash/Spam folders when available.
-- SMTP sending with authenticated SSL/STARTTLS transport, To/Cc/Bcc delivery (Bcc is never exposed in message headers), plain-text and HTML alternatives, and multiple MIME attachments; sent messages are copied to the server's Sent folder when that folder is exposed.
+- SMTP sending with authenticated SSL/STARTTLS transport, To/Cc/Bcc delivery (Bcc is never exposed in message headers), plain-text and HTML alternatives, and multiple MIME attachments; sent messages are copied to the server's Sent folder when that folder is exposed. Durable database-backed send-attempt records prevent duplicate submissions across sessions and PHP workers; uncertain outcomes are blocked rather than automatically retried.
 - Draft saving to the server's Drafts folder when available.
 - SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, optional HTML alternatives, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Conversation grouping, push/IDLE sync, and full folder-specific retention policies remain future work.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, optional HTML alternatives, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Conversation grouping, push/IDLE sync, rich-text editing, and full folder-specific retention policies remain future work.
 
 ## Requirements
 
@@ -22,7 +22,7 @@ PHP 8.2+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extensi
 ## Quick start
 
 1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
-2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`.
 3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
 4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
 5. Visit `APP_URL` and sign in.
