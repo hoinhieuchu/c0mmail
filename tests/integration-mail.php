@@ -61,6 +61,7 @@ $rawMessage = $smtp->send(
 integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS delivery returns the exact MIME payload');
 
 $startTlsSettings = $settings;
+$startTlsSettings['smtp_host'] = '127.0.0.1';
 $startTlsSettings['smtp_port'] = (int)(getenv('STARTTLS_SMTP_PORT') ?: 3587);
 $startTlsSettings['smtp_encryption'] = 'starttls';
 $startTlsSubject = $subject . ' STARTTLS';
