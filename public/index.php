@@ -6,7 +6,29 @@ use App\Providers\LocalSessionMemberProvider;use App\Providers\ManualMailProvide
 use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
 require dirname(__DIR__).'/app/bootstrap.php';
 $config=Config::load(dirname(__DIR__).'/.env');
-if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$config->get('APP_ENV')==='production','samesite'=>'Lax']);session_start();}
+$isProduction = $config->get('APP_ENV') === 'production';
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    session_name($config->get('APP_SESSION_NAME', 'c0mmail_session'));
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $isProduction || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+}
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'");
+header('Cache-Control: private, no-store, max-age=0');
+if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
 $providerName=$config->get('MAIL_PROVIDER','manual');
