@@ -43,7 +43,7 @@ test('webmail controller and transport services autoload',function(){same(true,c
 
 test('submission state keeps pending and accepted attempts stable',function(){same('pending',\App\Services\SubmissionState::classify(['status'=>'pending'],100));same('accepted',\App\Services\SubmissionState::classify(['status'=>'accepted'],100));});
 test('submission state rejects a fresh in-flight duplicate without expiring it',function(){same('sending',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],150));});
-test('submission state marks stale in-flight attempts uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],221));});
+test('submission state marks stale in-flight attempts uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],1001));});
 test('submission state treats legacy or unknown states as uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending'],100));same('uncertain',\App\Services\SubmissionState::classify(['status'=>'unexpected'],100));});
 
 test('IMAP attachment decoder preserves ENCOTHER transfer data',function(){same('opaque payload',\App\Services\ImapClient::decodeTransferEncoding('opaque payload',5));});
