@@ -7,6 +7,6 @@
 5. Generate an application key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
 6. Import `database/migrations/001_initial_schema.sql` using phpMyAdmin.
 7. Run the administrator bootstrap from Terminal/SSH: `php bin/create-admin.php admin@example.com 'minimum-14-character-password'`. Use `bin/create-member.php` for member accounts.
-8. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP has PDO MySQL and OpenSSL enabled.
+8. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP has PDO MySQL, OpenSSL, and the IMAP extension (`imap`) enabled. On cPanel, enable IMAP in Select PHP Version or ask the hosting provider to enable it for the selected PHP version.
 
-Use `MAIL_PROVIDER=manual` until CraneMail confirms its API contract and provides API credentials. Provision mailboxes at CraneMail first, then register them in the admin panel. The first password is displayed once for secure handoff. Connect a real mail client to the SMTP/IMAP endpoints configured for your provider.
+Use `MAIL_PROVIDER=manual` until CraneMail confirms its API contract and provides API credentials. Provision mailboxes at CraneMail first, then register them in the admin panel. The first password is displayed once for secure handoff. Open `/mail` after signing in to use the browser webmail. The host must allow outbound SMTP and IMAP connections; configure valid TLS certificates and the exact server hostnames, ports, and encryption modes supplied by CraneMail.
