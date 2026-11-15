@@ -91,7 +91,8 @@ final class WebmailController
             $attachments = $this->uploadedAttachments();
             if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
-            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments);
+            $rawMessage = $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
+            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders);
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
                 if ($sentFolder !== null) $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
@@ -156,7 +157,8 @@ final class WebmailController
             if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
             $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
             if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
-            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments);
+            $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
+            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders);
             $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
             exit;
