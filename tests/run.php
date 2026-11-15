@@ -145,4 +145,19 @@ test('conversation grouper does not merge unrelated messages with matching subje
  ]);
  same(2,count($groups));
 });
+
+test('HTML email sanitizer strips scripts, event handlers, and unsafe links',function(){
+ $clean=\App\Services\HtmlEmailSanitizer::sanitize('<p onclick="evil()">Hello <strong>safe</strong><script>alert(1)</script><a href="javascript:alert(1)" onclick="evil()">bad</a><a href="https://example.test">link</a></p>');
+ same(false,str_contains(strtolower((string)$clean),'<script'));
+ same(false,str_contains(strtolower((string)$clean),'onclick'));
+ same(false,str_contains(strtolower((string)$clean),'javascript:'));
+ same(true,str_contains((string)$clean,'<strong>safe</strong>'));
+ same(true,str_contains((string)$clean,'href="https://example.test"'));
+});
+test('MIME builder sanitizes HTML before sending and archiving',function(){
+ $raw=\App\Services\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Hello','plain','<p onclick="x()">safe<script>unsafe()</script></p>');
+ same(false,str_contains(strtolower($raw),'<script'));
+ same(false,str_contains(strtolower($raw),'onclick'));
+ same(true,str_contains($raw,'<p>safe</p>'));
+});
 echo "{$count} tests passed.\n";
