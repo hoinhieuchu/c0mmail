@@ -39,6 +39,29 @@ final class MailboxService
         elseif($m['provider']!=='manual')throw new \RuntimeException('Provider mailbox ID is missing; refusing to claim remote suspension.');
         $this->repo->setStatus($id,'suspended');
     }
+    /** Returns credentials only after verifying ownership and active status. */
+    public function credentialsForUser(int $mailboxId, int $userId): array
+    {
+        $mailbox = $this->repo->findForUser($mailboxId, $userId);
+        if (!$mailbox || $mailbox['status'] !== 'active') throw new \\RuntimeException('Active mailbox not found.');
+        if (empty($mailbox['password_ciphertext']) || empty($mailbox['password_nonce']) || empty($mailbox['password_tag'])) {
+            throw new \\RuntimeException('Mailbox credentials are unavailable. Re-provision the mailbox password before using webmail.');
+        }
+        $password = openssl_decrypt(
+            base64_decode($mailbox['password_ciphertext'], true) ?: '',
+            'aes-256-gcm',
+            $this->encryptionKey(),
+            OPENSSL_RAW_DATA,
+            hex2bin($mailbox['password_nonce']) ?: '',
+            hex2bin($mailbox['password_tag']) ?: ''
+        );
+        if ($password === false) throw new \\RuntimeException('Unable to decrypt mailbox credentials. Check APP_KEY.');
+        return [
+            'mailbox' => ['id' => (int)$mailbox['id'], 'email' => $mailbox['email'], 'display_name' => $mailbox['display_name']],
+            'credentials' => ['email' => $mailbox['email'], 'password' => $password],
+            'settings' => $this->provider->connectionSettings(),
+        ];
+    }
     private function encryptionKey():string
     {
         $raw=$this->config->required('APP_KEY');if(!str_starts_with($raw,'base64:'))throw new \RuntimeException('APP_KEY must use base64: prefix.');
