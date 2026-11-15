@@ -13,7 +13,7 @@
 - CI workflow: `.github/workflows/php.yml`; test runner: `php tests/run.php`.
 
 ## Current implementation notes
-- IMAP listing uses UID search and offset-based pagination; page stability under new arrivals still needs UID-cursor pagination and UIDVALIDITY handling.
+- IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
 - IMAP move uses `imap_mail_move`; do not call broad `imap_expunge` because it can expunge unrelated messages marked Deleted in the source folder.
 - SMTP acceptance and saving the Sent copy are separate outcomes. Never report SMTP acceptance as failed solely because the Sent APPEND failed.
 - Compose forms carry a per-session one-time submission token; accepted attempts retain a stable Message-ID and duplicate POSTs return the existing accepted state instead of sending again. A request that ends after SMTP submission starts but before acceptance is recorded is marked uncertain and must be reconciled against Sent.

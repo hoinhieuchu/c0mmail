@@ -37,10 +37,33 @@ final class WebmailController
             $folderNames = array_column($folders, 'name');
             $folder = (string)($_GET['folder'] ?? 'INBOX');
             if (!in_array($folder, $folderNames, true)) $folder = in_array('INBOX', $folderNames, true) ? 'INBOX' : ($folderNames[0] ?? 'INBOX');
-            $page = max(1, min(1000, (int)($_GET['page'] ?? 1)));
+            $page = 1;
             $query = trim((string)($_GET['q'] ?? ''));
             if (strlen($query) > 200) throw new \InvalidArgumentException('Search query is too long.');
-            $messages = $this->imap->listMessages($context['settings'], $context['credentials'], $folder, 51, ($page - 1) * 50, $query !== '' ? $query : null);
+            $beforeUid = isset($_GET['before']) ? (int)$_GET['before'] : null;
+            $afterUid = isset($_GET['after']) ? (int)$_GET['after'] : null;
+            if ($beforeUid !== null && $beforeUid < 1) $beforeUid = null;
+            if ($afterUid !== null && $afterUid < 1) $afterUid = null;
+            if ($beforeUid !== null && $afterUid !== null) {
+                $beforeUid = null;
+                $afterUid = null;
+            }
+            $uidValidity = $this->imap->uidValidity($context['settings'], $context['credentials'], $folder);
+            $requestedValidity = (int)($_GET['uidvalidity'] ?? 0);
+            if (($beforeUid !== null || $afterUid !== null) && ($requestedValidity < 1 || $requestedValidity !== $uidValidity)) {
+                $beforeUid = null;
+                $afterUid = null;
+            }
+            $messages = $this->imap->listMessages(
+                $context['settings'],
+                $context['credentials'],
+                $folder,
+                51,
+                0,
+                $query !== '' ? $query : null,
+                $beforeUid,
+                $afterUid
+            );
             $hasMore = count($messages) > 50;
             $messages = array_slice($messages, 0, 50);
             $selected = null;
@@ -68,7 +91,8 @@ final class WebmailController
             $this->render([
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
-                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,'compose'=>$compose,
+                'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
+                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
             error_log('Webmail mailbox view failed: ' . get_class($e));

@@ -33,6 +33,39 @@ final class ImapClient
         return $folder;
     }
 
+    public static function buildUidSearchCriteria(?string $query, ?int $beforeUid = null, ?int $afterUid = null): string
+    {
+        if ($beforeUid !== null && $afterUid !== null) {
+            throw new \InvalidArgumentException('Only one IMAP pagination cursor may be used.');
+        }
+        $criteria = self::buildSearchCriteria($query);
+        if ($beforeUid !== null) {
+            if ($beforeUid < 2) throw new \InvalidArgumentException('Invalid older-message cursor.');
+            return 'UID 1:' . ($beforeUid - 1) . ' ' . $criteria;
+        }
+        if ($afterUid !== null) {
+            if ($afterUid < 1 || $afterUid === PHP_INT_MAX) throw new \InvalidArgumentException('Invalid newer-message cursor.');
+            return 'UID ' . ($afterUid + 1) . ':* ' . $criteria;
+        }
+        return $criteria;
+    }
+
+    public function uidValidity(array $settings, array $credentials, string $folder): int
+    {
+        $this->requireExtension();
+        $mailbox = $this->prefix($settings) . $this->encodeFolder($folder);
+        $stream = $this->open($mailbox, $credentials, OP_READONLY);
+        try {
+            $status = imap_status($stream, $mailbox, SA_UIDVALIDITY);
+            if ($status === false || empty($status->uidvalidity)) {
+                throw new \RuntimeException('IMAP server did not provide UIDVALIDITY for this folder.');
+            }
+            return (int)$status->uidvalidity;
+        } finally {
+            imap_close($stream);
+        }
+    }
+
     public function folders(array $settings, array $credentials): array
     {
         $this->requireExtension();
@@ -52,18 +85,25 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50, int $offset = 0, ?string $query = null): array
+    public function listMessages(array $settings, array $credentials, string $folder, int $limit = 50, int $offset = 0, ?string $query = null, ?int $beforeUid = null, ?int $afterUid = null): array
     {
         $this->requireExtension();
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
             if ($offset < 0) throw new \InvalidArgumentException('Invalid message offset.');
             $limit = max(1, min(101, $limit));
-            $criteria = self::buildSearchCriteria($query);
+            $criteria = self::buildUidSearchCriteria($query, $beforeUid, $afterUid);
+            if ($beforeUid !== null && $beforeUid < 2) return [];
             $uids = imap_search($stream, $criteria, SE_UID, 'UTF-8');
             if ($uids === false) return [];
-            rsort($uids, SORT_NUMERIC);
-            $uids = array_slice($uids, $offset, $limit);
+            if ($afterUid !== null) {
+                sort($uids, SORT_NUMERIC);
+                $uids = array_slice($uids, 0, $limit);
+                $uids = array_reverse($uids);
+            } else {
+                rsort($uids, SORT_NUMERIC);
+                $uids = array_slice($uids, $offset, $limit);
+            }
             if (!$uids) return [];
             $overview = imap_fetch_overview($stream, implode(',', $uids), FT_UID);
             $byUid = [];
