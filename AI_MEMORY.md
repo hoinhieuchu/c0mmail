@@ -38,3 +38,5 @@
 - Submission idempotency is session-scoped, not durable across session expiry or a lost session store; database-backed delivery idempotency remains a future hardening task. The pure `SubmissionState` classifier keeps pending/accepted/in-flight/uncertain transitions testable; CI covers its active and stale-send decisions.
 - PHP sessions use strict mode, cookie-only transport, HttpOnly/SameSite cookies, 30-minute idle timeout and 12-hour absolute timeout.
 - Global response headers include CSP, anti-framing, MIME sniffing protection, referrer policy, private no-store caching, and HSTS on HTTPS. Production PHP INI guidance disables displayed errors and enables server-side error logging. CSP-compatible UI behavior is delegated to the same-origin JavaScript asset; the public .user.ini is denied by Apache.
+
+- GitHub Actions runs the PHP unit suite on PHP 8.2–8.5. The PHP 8.5 matrix leg also runs protocol integration checks against an isolated GreenMail SMTP/IMAPS server with a trusted ephemeral TLS certificate; these checks validate the adapter contract, not the production CraneMail endpoint.

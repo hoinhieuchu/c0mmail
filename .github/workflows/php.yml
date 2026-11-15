@@ -20,3 +20,38 @@ jobs:
         run: find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Automated tests
         run: php tests/run.php
+      - name: Start GreenMail TLS test server
+        if: matrix.php-version == '8.5'
+        run: |
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout /tmp/greenmail.key -out /tmp/greenmail.crt -days 1 \
+            -subj "/CN=localhost" \
+            -addext "subjectAltName=DNS:localhost" \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,digitalSignature,keyEncipherment,keyCertSign"
+          openssl pkcs12 -export -in /tmp/greenmail.crt -inkey /tmp/greenmail.key \
+            -out /tmp/greenmail.p12 -passout pass:changeit -name greenmail
+          sudo cp /tmp/greenmail.crt /usr/local/share/ca-certificates/greenmail-test.crt
+          sudo update-ca-certificates
+          docker run -d --name greenmail \
+            -p 3465:3465 -p 3993:3993 \
+            -v /tmp/greenmail.p12:/home/greenmail/greenmail.p12:ro \
+            -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.users=test1:pwd1 -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
+            greenmail/standalone:2.1.15
+          ready=0
+          for attempt in $(seq 1 60); do
+            if (echo > /dev/tcp/127.0.0.1/3465) 2>/dev/null && (echo > /dev/tcp/127.0.0.1/3993) 2>/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            docker logs greenmail
+            exit 1
+          fi
+      - name: IMAP/SMTP integration tests
+        if: matrix.php-version == '8.5'
+        env:
+          SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
+        run: php tests/integration-mail.php
