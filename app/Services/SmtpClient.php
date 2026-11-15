@@ -23,8 +23,9 @@ final class SmtpClient
             'peer_name' => $host,
             'SNI_enabled' => true,
         ]]);
+        $phase = 'before_data';
         $socket = @stream_socket_client($target, $errno, $error, 20, STREAM_CLIENT_CONNECT, $context);
-        if (!$socket) throw new \RuntimeException('SMTP connection failed. Check the configured host, port, and TLS certificate.');
+        if (!$socket) throw new SmtpDeliveryException('SMTP connection failed. Check the configured host, port, and TLS certificate.', false);
         stream_set_timeout($socket, 20);
         try {
             $this->expect($socket, [220]);
@@ -52,7 +53,7 @@ final class SmtpClient
             return $message;
         } catch (SmtpDeliveryException $e) {
             throw $e;
-        } catch (\\Throwable $e) {
+        } catch (\Throwable $e) {
             $uncertain = $phase === 'data';
             throw new SmtpDeliveryException(
                 $uncertain
