@@ -5,16 +5,17 @@ use App\Core\Csrf;
 use App\Core\View;
 use App\Repositories\UserRepository;
 use App\Repositories\LoginRateLimitRepository;
+use App\Services\ClientIpResolver;
 final class AuthController
 {
-    public function __construct(private UserRepository $users, private LoginRateLimitRepository $loginLimits, private View $view){}
+    public function __construct(private UserRepository $users, private LoginRateLimitRepository $loginLimits, private View $view, private array $trustedProxyCidrs = []){}
     public function showLogin():void{$this->view->render('login',['title'=>'Sign in','error'=>null]);}
     public function login():void
     {
         Csrf::verify();
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $password = (string)($_POST['password'] ?? '');
-        $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP) ?: 'unknown';
+        $ip = ClientIpResolver::resolve($_SERVER, $this->trustedProxyCidrs);
 
         if ($this->loginLimits->isBlocked($email, $ip)) {
             $this->view->render('login', ['title'=>'Sign in', 'error'=>'Email or password is incorrect.']);
