@@ -14,10 +14,10 @@ final class ImapClient
     {
         $query = trim((string)$query);
         if ($query === '') return 'ALL';
-        if (strlen($query) > 200 || preg_match('/[\\x00-\\x1F\\x7F]/', $query)) {
+        if (strlen($query) > 200 || preg_match('/[\x00-\x1F\x7F]/', $query) || str_contains($query, '"') || str_contains($query, '\\')) {
             throw new \InvalidArgumentException('Search query contains unsupported characters.');
         }
-        return 'TEXT "' . addcslashes($query, "\\\\"") . '"';
+        return 'TEXT "' . $query . '"';
     }
 
     public function folders(array $settings, array $credentials): array
