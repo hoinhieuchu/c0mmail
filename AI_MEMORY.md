@@ -46,3 +46,5 @@
 - GreenMail integration revealed that ext-imap may expose MIME parameter collections as `stdClass` rather than arrays; `ImapClient` now normalizes array, Traversable, and object parameter groups before RFC 2231 decoding.
 
 - Compose and server-side Drafts accept To, Cc, and Bcc recipients. SMTP envelope delivery includes all recipient classes; RFC 5322 headers emit To and Cc only, never Bcc. The MIME builder validates and deduplicates recipients across fields and enforces the aggregate 50-recipient limit. Unit tests cover Bcc privacy and invalid Cc recipient rejection.
+
+- SMTP response classification distinguishes explicit negative SMTP replies (4xx/5xx) from missing or malformed final responses. An explicit negative reply after DATA is a definitive rejection and may safely transition the same immutable send attempt to `failed`; a disconnect/timeout or unexpected non-negative response after DATA remains `uncertain`. Unit tests exercise both protocol response classes through socket-pair fixtures.
