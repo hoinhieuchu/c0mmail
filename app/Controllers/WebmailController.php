@@ -11,6 +11,7 @@ use App\Services\ImapClient;
 use App\Services\ConversationGrouper;
 use App\Services\MailboxService;
 use App\Services\MimeMessageBuilder;
+use App\Services\HtmlEmailSanitizer;
 use App\Services\SmtpClient;
 use App\Services\SmtpDeliveryException;
 
@@ -112,7 +113,7 @@ final class WebmailController
             ]);
         } catch (\Throwable $e) {
             error_log('Webmail mailbox view failed: ' . get_class($e));
-            $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$this->userFacingError($e)]);
+            $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$this->userFacingError($e),'compose'=>$composeOverride]);
         }
     }
 
