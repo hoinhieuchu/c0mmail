@@ -27,7 +27,7 @@ header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'");
 header('Cache-Control: private, no-store, max-age=0');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
-    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    header('Strict-Transport-Security: max-age=31536000');
 }
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');

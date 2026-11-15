@@ -1,4 +1,7 @@
 Options -Indexes
+<FilesMatch "^\.user\.ini$">
+    Require all denied
+</FilesMatch>
 RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
