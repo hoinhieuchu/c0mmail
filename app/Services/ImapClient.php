@@ -52,7 +52,7 @@ final class ImapClient
             if ($offset < 0) throw new \InvalidArgumentException('Invalid message offset.');
             $limit = max(1, min(101, $limit));
             $criteria = self::buildSearchCriteria($query);
-            $uids = imap_search($stream, $criteria, SE_UID);
+            $uids = imap_search($stream, $criteria, SE_UID, 'UTF-8');
             if ($uids === false) return [];
             rsort($uids, SORT_NUMERIC);
             $uids = array_slice($uids, $offset, $limit);
