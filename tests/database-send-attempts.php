@@ -60,6 +60,12 @@ try {
     $repo->createPending($failedToken, $userId, $mailboxId);
     $repo->claim($failedToken, $userId, $mailboxId, $failedHash, "<{$failedToken}@c0m.me>");
     $repo->markFailed($failedToken, $userId, $mailboxId);
+    try {
+        $repo->claim($failedToken, $userId, $mailboxId, hash('sha256', 'tampered retry'), "<{$failedToken}@c0m.me>");
+        throw new RuntimeException('Changed payload was accepted for a failed token.');
+    } catch (InvalidArgumentException $e) {
+        $check(str_contains($e->getMessage(), 'different message content'), 'failed token cannot be retried with changed payload');
+    }
     $safeRetry = $repo->claim($failedToken, $userId, $mailboxId, $failedHash, "<{$failedToken}@c0m.me>");
     $check(($safeRetry['status'] ?? '') === 'sending' && !empty($safeRetry['claimed']), 'definitive pre-DATA failure permits a safe retry with the same token');
 
