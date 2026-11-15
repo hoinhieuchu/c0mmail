@@ -89,6 +89,8 @@ final class ImapClient
                 'to' => $this->decodeHeader((string)($item->to ?? '')),
                 'cc' => $this->decodeHeader((string)($item->cc ?? '')),
                 'date' => (string)($item->date ?? ''),
+                'seen' => !empty($item->seen),
+                'flagged' => !empty($item->flagged),
                 'message_id' => trim((string)($item->message_id ?? '')),
                 'in_reply_to' => trim((string)($item->in_reply_to ?? '')),
                 'references' => trim((string)($item->references ?? '')),
