@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-namespace App\\Repositories;
+namespace App\Repositories;
 
 use PDO;
 
@@ -18,7 +18,7 @@ final class LoginRateLimitRepository
     public function __construct(private PDO $db, private string $applicationKey)
     {
         if ($this->applicationKey === '') {
-            throw new \\InvalidArgumentException('Application key is required for login throttling.');
+            throw new \InvalidArgumentException('Application key is required for login throttling.');
         }
     }
 
