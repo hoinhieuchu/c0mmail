@@ -129,12 +129,14 @@ final class ImapClient
             imap_errors();
             $overview = imap_fetch_overview($stream, implode(',', $uids), FT_UID);
             $overviewErrors = imap_errors() ?: [];
-            if ($overview === false && $overviewErrors !== []) {
-                throw new \RuntimeException('IMAP message summary retrieval failed: ' . implode('; ', array_map('strval', $overviewErrors)));
+            if ($overview === false || $overview === []) {
+                $detail = $overviewErrors !== [] ? ' ' . implode('; ', array_map('strval', $overviewErrors)) : '';
+                throw new \RuntimeException('IMAP returned no summaries for matching message UIDs.' . $detail);
             }
             $byUid = [];
             foreach ($overview ?: [] as $item) {
                 $uid = (int)($item->uid ?? 0);
+                if ($uid < 1 || !in_array($uid, $uids, true)) continue;
                 $byUid[$uid] = [
                     'uid' => $uid,
                     'subject' => $this->decodeHeader((string)($item->subject ?? '(no subject)')),
@@ -171,8 +173,14 @@ final class ImapClient
             }
             if (!$overview) throw new \RuntimeException('Message not found.');
             $item = $overview[0];
+            if ((int)($item->uid ?? 0) !== $uid) throw new \RuntimeException('Message not found.');
+            imap_errors();
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
-            if ($structure === false) throw new \RuntimeException('Message MIME structure could not be retrieved.');
+            $structureErrors = imap_errors() ?: [];
+            if ($structure === false) {
+                $detail = $structureErrors !== [] ? ' ' . implode('; ', array_map('strval', $structureErrors)) : '';
+                throw new \RuntimeException('Message MIME structure could not be retrieved.' . $detail);
+            }
             self::validateMessageSize((int)($structure->bytes ?? 0));
             $attachments = [];
             $body = $this->extractBody($stream, $uid, $structure, $attachments);
@@ -186,7 +194,7 @@ final class ImapClient
                 'to' => $this->decodeHeader((string)($item->to ?? '')),
                 'cc' => $this->decodeHeader((string)($item->cc ?? '')),
                 'date' => (string)($item->date ?? ''),
-                'seen' => !empty($item->seen),
+                'seen' => true,
                 'flagged' => !empty($item->flagged),
                 'message_id' => trim((string)($item->message_id ?? '')),
                 'in_reply_to' => trim((string)($item->in_reply_to ?? '')),
