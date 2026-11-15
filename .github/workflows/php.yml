@@ -42,25 +42,30 @@ jobs:
           sudo cp /tmp/greenmail-ca.crt /usr/local/share/ca-certificates/greenmail-test-ca.crt
           sudo update-ca-certificates
           docker run -d --name greenmail \
-            -p 3025:3025 -p 3465:3465 -p 3993:3993 \
+            -p 3465:3465 -p 3993:3993 \
             -v /tmp/greenmail.p12:/home/greenmail/greenmail.p12:ro \
             -e GREENMAIL_OPTS="-Dgreenmail.setup.test.all -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=test1:pwd1@example.com -Dgreenmail.users.login=email -Dgreenmail.tls.keystore.file=/home/greenmail/greenmail.p12 -Dgreenmail.tls.keystore.password=changeit" \
             greenmail/standalone:2.1.15
+          python3 tests/fixtures/starttls_smtp_server.py \
+            --port 3587 --cert /tmp/greenmail.crt --key /tmp/greenmail.key \
+            --capture /tmp/c0mmail-starttls.eml --username test1@example.com --password pwd1 \
+            >/tmp/starttls-smtp.log 2>&1 &
+          echo $! > /tmp/starttls-smtp.pid
           ready=0
           for attempt in $(seq 1 15); do
             if timeout 3 openssl s_client -connect 127.0.0.1:3993 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-imaps.log 2>&1 \
               && timeout 3 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1 \
-              && printf 'QUIT\r\n' | timeout 3 openssl s_client -starttls smtp -connect 127.0.0.1:3025 -servername localhost \
-                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief >/tmp/greenmail-starttls.log 2>&1; then
+              && printf 'QUIT\r\n' | timeout 5 openssl s_client -starttls smtp -connect 127.0.0.1:3587 -servername localhost \
+                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief >/tmp/starttls-smtp-probe.log 2>&1; then
               ready=1
               break
             fi
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
-            cat /tmp/greenmail-imaps.log /tmp/greenmail-smtps.log /tmp/greenmail-starttls.log || true
+            cat /tmp/greenmail-imaps.log /tmp/greenmail-smtps.log /tmp/starttls-smtp-probe.log /tmp/starttls-smtp.log || true
             docker logs greenmail
             exit 1
           fi
@@ -71,4 +76,6 @@ jobs:
         run: php -d openssl.cafile=/etc/ssl/certs/ca-certificates.crt tests/integration-mail.php
       - name: Dump GreenMail logs on failure
         if: failure() && matrix.php-version == '8.5'
-        run: docker logs greenmail || true
+        run: |
+          docker logs greenmail || true
+          cat /tmp/starttls-smtp.log || true
