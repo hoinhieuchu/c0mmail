@@ -55,14 +55,14 @@ final class WebmailController
                     $from = (string)$selected['from'];
                     if (preg_match('/<([^<>]+)>/', $from, $match)) $from = $match[1];
                     if (filter_var(trim($from), FILTER_VALIDATE_EMAIL)) $compose['to'] = trim($from);
-                    $quoted = preg_split('/\\r\\n|\\r|\\n/', (string)$selected['body']) ?: [];
-                    $quoted = implode("\\n", array_map(static fn(string $line): string => '> ' . $line, $quoted));
-                    $compose['body'] = "\\n\\nOn " . $selected['date'] . ', ' . $selected['from'] . " wrote:\\n" . $quoted;
+                    $quoted = preg_split('/\r\n|\r|\n/', (string)$selected['body']) ?: [];
+                    $quoted = implode("\n", array_map(static fn(string $line): string => '> ' . $line, $quoted));
+                    $compose['body'] = "\n\nOn " . $selected['date'] . ', ' . $selected['from'] . " wrote:\n" . $quoted;
                     $compose['in_reply_to'] = (string)($selected['message_id'] ?? '');
                     $references = trim((string)($selected['references'] ?? '') . ' ' . (string)($selected['message_id'] ?? ''));
                     $compose['references'] = strlen($references) > 998 ? substr($references, -998) : $references;
                 } else {
-                    $compose['body'] = "---------- Forwarded message ----------\\nFrom: " . $selected['from'] . "\\nDate: " . $selected['date'] . "\\nSubject: " . $selected['subject'] . "\\nTo: " . $selected['to'] . "\\n\\n" . $selected['body'];
+                    $compose['body'] = "---------- Forwarded message ----------\nFrom: " . $selected['from'] . "\nDate: " . $selected['date'] . "\nSubject: " . $selected['subject'] . "\nTo: " . $selected['to'] . "\n\n" . $selected['body'];
                 }
             }
             $this->render([
