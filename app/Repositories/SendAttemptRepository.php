@@ -44,7 +44,7 @@ final class SendAttemptRepository
         $claim = $this->db->prepare(
             "UPDATE mail_send_attempts
              SET status='sending', payload_hash=?, message_id=?, updated_at=CURRENT_TIMESTAMP
-             WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status='pending'"
+             WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status IN ('pending','failed')"
         );
         $claim->execute([$payloadHash, $messageId, $submissionId, $userId, $mailboxId]);
         if ($claim->rowCount() === 1) {
@@ -84,6 +84,15 @@ final class SendAttemptRepository
                 throw new RuntimeException('Unable to persist SMTP acceptance state.');
             }
         }
+    }
+
+    public function markFailed(string $submissionId, int $userId, int $mailboxId): void
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE mail_send_attempts SET status='failed', updated_at=CURRENT_TIMESTAMP
+             WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status='sending'"
+        );
+        $stmt->execute([$submissionId, $userId, $mailboxId]);
     }
 
     public function markUncertain(string $submissionId, int $userId, int $mailboxId): void
