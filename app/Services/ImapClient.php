@@ -165,7 +165,7 @@ final class ImapClient
     public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
     {
         $this->requireExtension();
-        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section) || !in_array($encoding, [0, 1, 2, 3, 4], true)) {
+        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section)) {
             throw new \InvalidArgumentException('Invalid attachment reference.');
         }
         self::validateFolderName($folder);
@@ -173,16 +173,27 @@ final class ImapClient
         try {
             $raw = imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
             if ($raw === false) throw new \RuntimeException('Attachment data could not be retrieved.');
-            if ($encoding === 3) {
-                $decoded = base64_decode($raw, true);
-                if ($decoded === false) throw new \RuntimeException('Attachment has invalid base64 encoding.');
-                $raw = $decoded;
-            } elseif ($encoding === 4) {
-                $raw = quoted_printable_decode($raw);
-            }
+            $raw = self::decodeTransferEncoding($raw, $encoding);
             if (strlen($raw) > 25_000_000) throw new \RuntimeException('Attachment exceeds the 25 MB download limit.');
             return $raw;
         } finally { imap_close($stream); }
+    }
+
+    /**
+     * Decode an IMAP body part's transfer encoding. ENCOTHER (5) is retained
+     * as-is, as are the 7bit, 8bit, and binary encodings.
+     */
+    public static function decodeTransferEncoding(string $raw, int $encoding): string
+    {
+        if (!in_array($encoding, [0, 1, 2, 3, 4, 5], true)) {
+            throw new \InvalidArgumentException('Unsupported IMAP transfer encoding.');
+        }
+        if ($encoding === 3) {
+            $decoded = base64_decode($raw, true);
+            if ($decoded === false) throw new \RuntimeException('Attachment has invalid base64 encoding.');
+            return $decoded;
+        }
+        return $encoding === 4 ? quoted_printable_decode($raw) : $raw;
     }
 
     public function appendRawMessage(array $settings, array $credentials, string $folder, string $raw, string $flag): void

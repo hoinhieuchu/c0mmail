@@ -42,4 +42,8 @@ test('submission state keeps pending and accepted attempts stable',function(){sa
 test('submission state rejects a fresh in-flight duplicate without expiring it',function(){same('sending',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],150));});
 test('submission state marks stale in-flight attempts uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending','started_at'=>100],221));});
 test('submission state treats legacy or unknown states as uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending'],100));same('uncertain',\App\Services\SubmissionState::classify(['status'=>'unexpected'],100));});
+
+test('IMAP attachment decoder preserves ENCOTHER transfer data',function(){same('opaque payload',\App\Services\ImapClient::decodeTransferEncoding('opaque payload',5));});
+test('IMAP attachment decoder handles base64 and quoted-printable',function(){same('binary data',\App\Services\ImapClient::decodeTransferEncoding(base64_encode('binary data'),3));same('hello world',\App\Services\ImapClient::decodeTransferEncoding('hello=20world',4));});
+test('IMAP attachment decoder rejects invalid encodings and malformed base64',function(){foreach([['payload',6],['%%%invalid%%%',3]] as [$payload,$encoding]){try{\App\Services\ImapClient::decodeTransferEncoding($payload,$encoding);throw new RuntimeException('Expected transfer-encoding rejection');}catch(InvalidArgumentException|RuntimeException $e){same(true,str_contains($e->getMessage(),'encoding'));}}});
 echo "{$count} tests passed.\n";
