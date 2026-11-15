@@ -11,7 +11,7 @@
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (41 cases); protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (41 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
@@ -36,11 +36,11 @@
 - Attachment downloads verify the requested folder against the authenticated mailbox's discovered folders.
 - The MIME header fallback emits folded RFC 2047 encoded-words when mbstring's encoder is unavailable.
 - The IMAP APPEND cap accounts for base64 expansion of the 25 MB aggregate attachment limit; PHP upload memory guidance is 192 MB.
-- Durable send idempotency is stored in MySQL by `SendAttemptRepository`: compose tokens are scoped to user/mailbox, claimed atomically before SMTP I/O, and fingerprint recipients, content, threading metadata, and attachment bytes. Only the claim winner sends; accepted retries return the recorded state; stale `sending` rows become `uncertain` and are never automatically retried. Rows older than 30 days are purged when a new compose token is issued. A crash after remote SMTP acceptance but before persisting acceptance remains inherently ambiguous and is blocked rather than retried. The pure `SubmissionState` classifier remains for unit-tested state semantics.
+- Durable send idempotency is stored in MySQL by `SendAttemptRepository`: compose tokens are scoped to user/mailbox, claimed atomically before SMTP I/O, and fingerprint recipients, content, threading metadata, and attachment bytes. Only the claim winner sends; accepted retries return the recorded state; stale `sending` rows older than fifteen minutes become `uncertain` and are never automatically retried. Rows older than 30 days are purged when a new compose token is issued. A crash after remote SMTP acceptance but before persisting acceptance remains inherently ambiguous and is blocked rather than retried. The pure `SubmissionState` classifier remains for unit-tested state semantics.
 - PHP sessions use strict mode, cookie-only transport, HttpOnly/SameSite cookies, 30-minute idle timeout and 12-hour absolute timeout.
 - Global response headers include CSP, anti-framing, MIME sniffing protection, referrer policy, private no-store caching, and HSTS on HTTPS. Production PHP INI guidance disables displayed errors and enables server-side error logging. CSP-compatible UI behavior is delegated to the same-origin JavaScript asset; the public .user.ini is denied by Apache.
 
-- GitHub Actions runs the PHP unit suite on PHP 8.2–8.5. The PHP 8.5 matrix leg runs IMAPS/SMTPS integration against GreenMail and SMTP STARTTLS against `tests/fixtures/starttls_smtp_server.py`, all with a trusted ephemeral TLS certificate. GreenMail does not implement STARTTLS (upstream issue #135), so do not try to enable it on its SMTP endpoint. These checks validate the adapter contract, not the production CraneMail endpoint.
+- GitHub Actions runs the PHP unit suite on PHP 8.2–8.5 and a dedicated MariaDB-backed persistence suite. The PHP 8.5 matrix leg runs IMAPS/SMTPS integration against GreenMail and SMTP STARTTLS against `tests/fixtures/starttls_smtp_server.py`, all with a trusted ephemeral TLS certificate. GreenMail does not implement STARTTLS (upstream issue #135), so do not try to enable it on its SMTP endpoint. These checks validate the adapter contract, not the production CraneMail endpoint.
 
 - GreenMail integration revealed that ext-imap may expose MIME parameter collections as `stdClass` rather than arrays; `ImapClient` now normalizes array, Traversable, and object parameter groups before RFC 2231 decoding.
 
