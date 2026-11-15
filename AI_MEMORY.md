@@ -7,7 +7,7 @@
 - Keep changes scoped to the PHP MVC webmail application and its tests/docs.
 
 ## Architecture
-- Database migrations: import `database/migrations/001_initial_schema.sql` followed by `002_mail_send_attempts.sql`; the latter is required for durable SMTP idempotency.
+- Database migrations: import `database/migrations/001_initial_schema.sql` followed by `002_mail_send_attempts.sql`, `003_send_attempt_failed_state.sql`, and `004_login_rate_limits.sql`; these provide durable SMTP idempotency, safe failure retries, and persistent login throttling.
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
@@ -48,3 +48,5 @@
 - Compose and server-side Drafts accept To, Cc, and Bcc recipients. SMTP envelope delivery includes all recipient classes; RFC 5322 headers emit To and Cc only, never Bcc. The MIME builder validates and deduplicates recipients across fields and enforces the aggregate 50-recipient limit. Unit tests cover Bcc privacy and invalid Cc recipient rejection.
 
 - SMTP response classification distinguishes explicit negative SMTP replies (4xx/5xx) from missing or malformed final responses. An explicit negative reply after DATA is a definitive rejection and may safely transition the same immutable send attempt to `failed`; a disconnect/timeout or unexpected non-negative response after DATA remains `uncertain`. Unit tests exercise both protocol response classes through socket-pair fixtures.
+
+- Login authentication uses MariaDB-backed throttling: 10 failures per normalized account and 30 failures per client IP in a rolling 15-minute window trigger a 15-minute block. Keys are HMAC-SHA256 values derived from APP_KEY; raw email and IP values are not persisted. Successful authentication clears both counters. Unknown accounts use a fixed dummy password hash to reduce timing-based account enumeration.
