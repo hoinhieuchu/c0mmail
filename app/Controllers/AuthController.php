@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Csrf;
 use App\Core\View;
 use App\Repositories\UserRepository;
+use App\Repositories\LoginRateLimitRepository;
 final class AuthController
 {
     public function __construct(private UserRepository $users, private LoginRateLimitRepository $loginLimits, private View $view){}
