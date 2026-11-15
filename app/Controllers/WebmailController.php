@@ -19,7 +19,8 @@ final class WebmailController
         private MailboxService $mailboxService,
         private ImapClient $imap,
         private SmtpClient $smtp,
-        private View $view
+        private View $view,
+        private SendAttemptRepository $sendAttempts
     ) {}
 
     public function index(): void
@@ -104,35 +105,15 @@ final class WebmailController
     {
         $user = $this->auth->requireLogin();
         $ownsSubmission = false;
+        $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+        $submissionId = (string)($_POST['submission_id'] ?? '');
         try {
             $this->assertPostBodyWithinLimit();
             Csrf::verify();
-            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
-            $submissionId = (string)($_POST['submission_id'] ?? '');
-            $submission = $_SESSION['webmail_submissions'][$submissionId] ?? null;
-            if (!preg_match('/^[a-f0-9]{32}$/', $submissionId) || !is_array($submission)) {
-                throw new \InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
+            if (!preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
+                throw new \\InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
             }
-            if (isset($submission['mailbox_id']) && (int)$submission['mailbox_id'] !== $mailboxId) {
-                throw new \InvalidArgumentException('This compose form is not valid for the selected mailbox.');
-            }
-            if (($submission['status'] ?? '') === 'accepted') {
-                $folder = (string)($submission['folder'] ?? 'INBOX');
-                $copy = (string)($submission['sent_copy'] ?? 'unavailable');
-                header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
-                exit;
-            }
-            $submissionStatus = \App\Services\SubmissionState::classify($submission);
-            if ($submissionStatus === 'sending') {
-                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
-            }
-            if ($submissionStatus === 'uncertain') {
-                $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
-                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
-            }
-            if ($submissionStatus !== 'pending' && $submissionStatus !== 'accepted') {
-                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
-            }
+
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $recipients = $this->parseRecipients((string)($_POST['to'] ?? ''), 'To');
             $ccRecipients = $this->parseRecipients((string)($_POST['cc'] ?? ''), 'Cc');
@@ -141,60 +122,74 @@ final class WebmailController
             $body = (string)($_POST['body'] ?? '');
             $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
             $attachments = $this->uploadedAttachments();
-            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
-            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
+            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \\InvalidArgumentException('Email subject or body is required.');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \\InvalidArgumentException('Message exceeds the allowed size.');
+
             $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
-            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'sending','mailbox_id'=>$mailboxId,'started_at'=>time()];
-            $ownsSubmission = true;
-            // Persist the in-flight state before network I/O. PHP normally writes
-            // session data only when the request ends; without this close, a worker
-            // crash after SMTP acceptance could leave the old "pending" token and
-            // allow a duplicate POST to send the same message again.
-            if (session_status() === PHP_SESSION_ACTIVE && !session_write_close()) {
-                throw new \RuntimeException('Unable to persist the send attempt state.');
-            }
+            // Fingerprint every delivery-relevant field, including attachment bytes.
+            // Reusing a form token with altered content is rejected, not treated as a retry.
+            $payloadHash = hash('sha256', serialize([
+                'from'=>$context['mailbox']['email'],'to'=>$recipients,'cc'=>$ccRecipients,'bcc'=>$bccRecipients,
+                'subject'=>$subject,'body'=>$body,'html_body'=>$htmlBody,'attachments'=>$attachments,'thread'=>$threadHeaders,
+            ]));
             $messageId = '<' . $submissionId . '@c0m.me>';
-            $rawMessage = $this->smtp->send($context['settings'], $context['credentials'], $context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId, $ccRecipients, $bccRecipients);
-            // Persist acceptance before attempting the optional Sent-folder APPEND.
-            // If APPEND or the worker fails, a retry must not send the email again.
-            if (session_status() !== PHP_SESSION_ACTIVE && !session_start()) {
-                throw new \RuntimeException('Unable to resume the send attempt session.');
+            $attempt = $this->sendAttempts->claim($submissionId, (int)$user['id'], $mailboxId, $payloadHash, $messageId);
+            $status = (string)($attempt['status'] ?? 'uncertain');
+            if ($status === 'accepted') {
+                $folder = (string)($attempt['sent_folder'] ?: 'INBOX');
+                $copy = (string)($attempt['sent_copy_status'] ?: 'pending');
+                header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
+                exit;
             }
-            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>'INBOX','sent_copy'=>'pending'];
-            if (!session_write_close()) {
-                throw new \RuntimeException('Unable to persist SMTP acceptance state.');
+            if ($status === 'sending') {
+                throw new \\RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
             }
+            if ($status !== 'sending') {
+                throw new \\RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
+            }
+
+            $ownsSubmission = true;
+            // The DB claim is committed before network I/O. A process crash leaves
+            // a durable sending record which becomes uncertain, never retryable.
+            if (session_status() === PHP_SESSION_ACTIVE && !session_write_close()) {
+                throw new \\RuntimeException('Unable to release the session before sending.');
+            }
+            $rawMessage = $this->smtp->send(
+                $context['settings'], $context['credentials'], $context['mailbox']['email'],
+                $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders,
+                $messageId, $ccRecipients, $bccRecipients
+            );
+
+            // Persist SMTP acceptance before the optional IMAP Sent APPEND.
+            $this->sendAttempts->markAccepted($submissionId, (int)$user['id'], $mailboxId);
             $sentFolder = null;
             $sentCopy = 'unavailable';
             try {
                 $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
                 if ($sentFolder !== null) {
-                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
+                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\\\Seen');
                     $sentCopy = 'saved';
                 }
-            } catch (\Throwable $saveError) {
+            } catch (\\Throwable $saveError) {
                 $sentCopy = 'failed';
                 error_log('Sent-folder copy failed after SMTP accepted message.');
             }
-            if (session_status() !== PHP_SESSION_ACTIVE && !session_start()) {
-                throw new \RuntimeException('Unable to resume the send attempt session.');
-            }
-            $_SESSION['webmail_submissions'][$submissionId] = ['status'=>'accepted','mailbox_id'=>$mailboxId,'folder'=>$sentFolder ?? 'INBOX','sent_copy'=>$sentCopy];
+            $this->sendAttempts->markSentCopy($submissionId, (int)$user['id'], $mailboxId, $sentFolder, $sentCopy);
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
             exit;
-        } catch (\Throwable $e) {
-            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
-            $submissionId = (string)($_POST['submission_id'] ?? '');
-            if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId) && isset($_SESSION['webmail_submissions'][$submissionId])
-                && ($_SESSION['webmail_submissions'][$submissionId]['status'] ?? '') === 'sending') {
-                $_SESSION['webmail_submissions'][$submissionId]['status'] = 'uncertain';
+        } catch (\\Throwable $e) {
+            if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
+                try {
+                    $this->sendAttempts->markUncertain($submissionId, (int)$user['id'], $mailboxId);
+                } catch (\\Throwable $stateError) {
+                    error_log('Unable to persist uncertain mail-send state: ' . get_class($stateError));
+                }
             }
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
             error_log('Webmail send failed: ' . get_class($e));
             $this->indexWithError($user, $this->userFacingError($e));
         }
     }
-
-
 
     public function downloadAttachment(): void
     {
@@ -412,13 +407,9 @@ final class WebmailController
     private function render(array $data): void
     {
         $data['compose'] = array_merge(['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $data['compose'] ?? []);
-        if (empty($data['compose']['submission_id'])) {
-            $tokens = $_SESSION['webmail_submissions'] ?? [];
-            if (!is_array($tokens)) $tokens = [];
+        if (empty($data['compose']['submission_id']) && !empty($data['user']['id']) && !empty($data['activeMailbox']['id'])) {
             $token = bin2hex(random_bytes(16));
-            $tokens[$token] = ['status'=>'pending'];
-            if (count($tokens) > 20) $tokens = array_slice($tokens, -20, null, true);
-            $_SESSION['webmail_submissions'] = $tokens;
+            $this->sendAttempts->createPending($token, (int)$data['user']['id'], (int)$data['activeMailbox']['id']);
             $data['compose']['submission_id'] = $token;
         }
         $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false], $data));
