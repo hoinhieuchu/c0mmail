@@ -7,6 +7,15 @@ namespace App\Services;
  */
 final class ImapClient
 {
+    public const MAX_MESSAGE_BYTES = 40_000_000;
+
+    public static function validateMessageSize(int $bytes): void
+    {
+        if ($bytes < 0 || $bytes > self::MAX_MESSAGE_BYTES) {
+            throw new \RuntimeException('Message exceeds the 40 MB retrieval limit.');
+        }
+    }
+
     public function available(): bool { return function_exists('imap_open'); }
 
 
@@ -161,6 +170,7 @@ final class ImapClient
             $item = $overview[0];
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
             if ($structure === false) throw new \RuntimeException('Message MIME structure could not be retrieved.');
+            self::validateMessageSize((int)($structure->bytes ?? 0));
             $attachments = [];
             $body = $this->extractBody($stream, $uid, $structure, $attachments);
             if (!imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID)) {
