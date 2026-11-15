@@ -43,9 +43,9 @@ final class MailboxService
     public function credentialsForUser(int $mailboxId, int $userId): array
     {
         $mailbox = $this->repo->findForUser($mailboxId, $userId);
-        if (!$mailbox || $mailbox['status'] !== 'active') throw new \\RuntimeException('Active mailbox not found.');
+        if (!$mailbox || $mailbox['status'] !== 'active') throw new \RuntimeException('Active mailbox not found.');
         if (empty($mailbox['password_ciphertext']) || empty($mailbox['password_nonce']) || empty($mailbox['password_tag'])) {
-            throw new \\RuntimeException('Mailbox credentials are unavailable. Re-provision the mailbox password before using webmail.');
+            throw new \RuntimeException('Mailbox credentials are unavailable. Re-provision the mailbox password before using webmail.');
         }
         $password = openssl_decrypt(
             base64_decode($mailbox['password_ciphertext'], true) ?: '',
@@ -55,7 +55,7 @@ final class MailboxService
             hex2bin($mailbox['password_nonce']) ?: '',
             hex2bin($mailbox['password_tag']) ?: ''
         );
-        if ($password === false) throw new \\RuntimeException('Unable to decrypt mailbox credentials. Check APP_KEY.');
+        if ($password === false) throw new \RuntimeException('Unable to decrypt mailbox credentials. Check APP_KEY.');
         return [
             'mailbox' => ['id' => (int)$mailbox['id'], 'email' => $mailbox['email'], 'display_name' => $mailbox['display_name']],
             'credentials' => ['email' => $mailbox['email'], 'password' => $password],
