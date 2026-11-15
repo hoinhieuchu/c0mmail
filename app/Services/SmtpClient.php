@@ -5,7 +5,7 @@ namespace App\Services;
 /** Authenticated SMTP client with mandatory TLS and RFC MIME message delivery. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null): string
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = []): string
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -13,8 +13,9 @@ final class SmtpClient
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('SMTP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid SMTP port.');
         if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
-        if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
-        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId);
+        if (!$recipients && !$ccRecipients && !$bccRecipients) throw new \InvalidArgumentException('At least one recipient is required.');
+        $envelopeRecipients = array_values(array_unique(array_merge($recipients, $ccRecipients, $bccRecipients)));
+        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders, $messageId, $ccRecipients, $bccRecipients);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
         $context = stream_context_create(['ssl' => [
             'verify_peer' => true,
@@ -39,7 +40,7 @@ final class SmtpClient
             $this->command($socket, base64_encode($credentials['email']), [334]);
             $this->command($socket, base64_encode($credentials['password']), [235]);
             $this->command($socket, 'MAIL FROM:<' . $from . '>', [250]);
-            foreach (array_unique($recipients) as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
+            foreach ($envelopeRecipients as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
             $wireMessage = preg_replace('/(?m)^\./', '..', str_replace(["\r\n", "\r"], "\n", $message));
             $this->writeAll($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
