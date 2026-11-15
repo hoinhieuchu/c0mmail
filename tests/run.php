@@ -65,14 +65,14 @@ test('MIME builder validates recipients across To Cc and Bcc',function(){
  catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'recipient'));}
 });
 test('MIME builder encodes sender display name and emits Reply-To',function(){
- $raw=\\App\\Services\\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Báo cáo tháng','body',null,[],[],null,[],[],'Nguyễn Văn A','reply@example.test');
+ $raw=\App\Services\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Báo cáo tháng','body',null,[],[],null,[],[],'Nguyễn Văn A','reply@example.test');
  same(true,str_contains($raw,'From: '));
  same(true,str_contains($raw,'=?UTF-8?B?'));
  same(true,str_contains($raw,'Reply-To: <reply@example.test>'));
 });
 test('MIME builder rejects invalid Reply-To and sender display-name injection',function(){
- foreach ([['reply'=>'not-an-email','name'=>'Sender'],['reply'=>null,'name'=>"Sender\\r\\nBcc: attacker@example.test"]] as $case) {
-  try{\\App\\Services\\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Hello','body',null,[],[],null,[],[],$case['name'],$case['reply']);throw new RuntimeException('Expected display-name or Reply-To validation');}
+ foreach ([['reply'=>'not-an-email','name'=>'Sender'],['reply'=>null,'name'=>"Sender\r\nBcc: attacker@example.test"]] as $case) {
+  try{\App\Services\MimeMessageBuilder::build('sender@example.test',['to@example.test'],'Hello','body',null,[],[],null,[],[],$case['name'],$case['reply']);throw new RuntimeException('Expected display-name or Reply-To validation');}
   catch(InvalidArgumentException $e){same(true,str_contains(strtolower($e->getMessage()),'reply-to') || str_contains(strtolower($e->getMessage()),'header'));}
  }
 });
