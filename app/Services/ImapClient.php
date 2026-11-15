@@ -202,10 +202,10 @@ final class ImapClient
         $type = (int)($structure->type ?? 0);
         $filename = $this->partFilename($structure);
         $disposition = strtolower((string)($structure->disposition ?? ''));
-        if ($filename !== '' || $disposition === 'attachment' || ($type !== 0 && $type !== 1)) {
+        if ($filename !== '' || $disposition === 'attachment' || ($type !== 0 && $type !== 1) || ($type === 0 && !in_array($subtype, ['plain', 'html'], true))) {
             $attachments[] = [
                 'section' => $section === '' ? '1' : $section,
-                'filename' => $filename !== '' ? $filename : 'attachment-' . count($attachments + []),
+                'filename' => $filename !== '' ? $this->decodeHeader($filename) : 'attachment-' . (count($attachments) + 1),
                 'mime' => $this->mimeType($type, $subtype),
                 'size' => (int)($structure->bytes ?? 0),
                 'encoding' => (int)($structure->encoding ?? 0),
