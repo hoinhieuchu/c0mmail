@@ -12,5 +12,6 @@ CREATE TABLE mail_send_attempts (
  CONSTRAINT fk_send_attempts_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
  CONSTRAINT fk_send_attempts_mailbox FOREIGN KEY (mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE,
  INDEX idx_send_attempts_owner (user_id, mailbox_id, created_at),
- INDEX idx_send_attempts_status_updated (status, updated_at)
+ INDEX idx_send_attempts_status_updated (status, updated_at),
+ INDEX idx_send_attempts_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
