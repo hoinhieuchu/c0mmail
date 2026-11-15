@@ -42,3 +42,5 @@
 - GitHub Actions runs the PHP unit suite on PHP 8.2–8.5. The PHP 8.5 matrix leg runs IMAPS/SMTPS integration against GreenMail and SMTP STARTTLS against `tests/fixtures/starttls_smtp_server.py`, all with a trusted ephemeral TLS certificate. GreenMail does not implement STARTTLS (upstream issue #135), so do not try to enable it on its SMTP endpoint. These checks validate the adapter contract, not the production CraneMail endpoint.
 
 - GreenMail integration revealed that ext-imap may expose MIME parameter collections as `stdClass` rather than arrays; `ImapClient` now normalizes array, Traversable, and object parameter groups before RFC 2231 decoding.
+
+- Compose and server-side Drafts accept To, Cc, and Bcc recipients. SMTP envelope delivery includes all recipient classes; RFC 5322 headers emit To and Cc only, never Bcc. The MIME builder validates and deduplicates recipients across fields and enforces the aggregate 50-recipient limit. Unit tests cover Bcc privacy and invalid Cc recipient rejection.
