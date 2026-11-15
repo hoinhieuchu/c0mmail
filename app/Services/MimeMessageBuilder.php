@@ -5,13 +5,13 @@ namespace App\Services;
 /** Builds RFC 5322/MIME messages shared by SMTP delivery and IMAP Sent/Drafts copies. */
 final class MimeMessageBuilder
 {
-    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null): string
+    public static function build(string $from, array $recipients, string $subject, string $textBody, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = [], ?string $messageId = null, array $ccRecipients = [], array $bccRecipients = []): string
     {
         self::assertHeader($from);
         self::assertHeader($subject, true);
         if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid sender address.');
-        if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
-        foreach ($recipients as $recipient) {
+        if (count($recipients) + count($ccRecipients) + count($bccRecipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
+        foreach (array_merge($recipients, $ccRecipients, $bccRecipients) as $recipient) {
             self::assertHeader((string)$recipient);
             if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
         }
@@ -27,8 +27,12 @@ final class MimeMessageBuilder
             $totalBytes += strlen($data);
             if ($totalBytes > 25_000_000) throw new \InvalidArgumentException('Total attachment size exceeds 25 MB.');
         }
-        $toHeader = implode(', ', array_unique($recipients));
-        if (strlen($toHeader) > 900) throw new \InvalidArgumentException('Recipient header exceeds the allowed length.');
+        $recipients = array_values(array_unique($recipients));
+        $ccRecipients = array_values(array_diff(array_unique($ccRecipients), $recipients));
+        $bccRecipients = array_values(array_diff(array_unique($bccRecipients), array_merge($recipients, $ccRecipients)));
+        $toHeader = implode(', ', $recipients);
+        $ccHeader = implode(', ', $ccRecipients);
+        if (strlen($toHeader) > 900 || strlen($ccHeader) > 900) throw new \InvalidArgumentException('Recipient header exceeds the allowed length.');
         $messageId ??= '<' . bin2hex(random_bytes(16)) . '@c0m.me>';
         if (!preg_match('/^<[^<>\s@]+@[a-zA-Z0-9.-]+>$/D', $messageId)) {
             throw new \InvalidArgumentException('Invalid Message-ID value.');
@@ -41,6 +45,7 @@ final class MimeMessageBuilder
             'Message-ID: ' . $messageId,
             'MIME-Version: 1.0',
         ];
+        if ($ccHeader !== '') $headers[] = 'Cc: ' . $ccHeader;
         foreach (['in_reply_to' => 'In-Reply-To', 'references' => 'References'] as $key => $headerName) {
             $value = trim((string)($threadHeaders[$key] ?? ''));
             if ($value !== '') {
