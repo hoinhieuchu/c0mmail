@@ -22,7 +22,7 @@ PHP 8.2+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extensi
 ## Quick start
 
 1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
-2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql` and `database/migrations/003_send_attempt_failed_state.sql`.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`, `database/migrations/003_send_attempt_failed_state.sql`, and `database/migrations/004_login_rate_limits.sql`.
 3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
 4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
 5. Visit `APP_URL` and sign in.
@@ -34,7 +34,7 @@ PHP 8.2+, PDO MySQL, OpenSSL, JSON, sessions, fileinfo, and the PHP IMAP extensi
 
 ## Tests
 
-Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/database-send-attempts.php` applies all three migrations and exercises the durable send-attempt repository against a MariaDB database (set `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`). `php tests/integration-mail.php` exercises IMAPS and SMTPS against GreenMail on ports 3993 and 3465, plus SMTP STARTTLS against the dedicated Python TLS-upgrade fixture in `tests/fixtures/starttls_smtp_server.py` (default port 3587). The fixture captures the accepted test message and validates SMTP AUTH. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5, runs the database idempotency integration suite against MariaDB, and its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs all protocol integration checks. GreenMail itself does not implement SMTP STARTTLS (upstream issue: https://github.com/greenmail-mail-test/greenmail/issues/135).
+Run `php tests/run.php` and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/database-send-attempts.php` applies all four migrations and exercises durable send-attempt persistence plus account/IP login throttling against a MariaDB database (set `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`). `php tests/integration-mail.php` exercises IMAPS and SMTPS against GreenMail on ports 3993 and 3465, plus SMTP STARTTLS against the dedicated Python TLS-upgrade fixture in `tests/fixtures/starttls_smtp_server.py` (default port 3587). The fixture captures the accepted test message and validates SMTP AUTH. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5, runs the database idempotency integration suite against MariaDB, and its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs all protocol integration checks. GreenMail itself does not implement SMTP STARTTLS (upstream issue: https://github.com/greenmail-mail-test/greenmail/issues/135).
 
 ## Security and limitations
 
