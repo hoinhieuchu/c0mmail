@@ -44,8 +44,8 @@ final class LoginRateLimitRepository
     public function clear(string $email, string $ip): void
     {
         [$emailHash, $ipHash] = $this->keyHashes($email, $ip);
-        $stmt = $this->db->prepare('DELETE FROM login_rate_limits WHERE key_hash IN (?, ?)');
-        $stmt->execute([$emailHash, $ipHash]);
+        $stmt = $this->db->prepare('DELETE FROM login_rate_limits WHERE key_hash = ?');
+        $stmt->execute([$emailHash]);
         $this->db->exec(
             'DELETE FROM login_rate_limits
              WHERE updated_at < DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)'
