@@ -76,4 +76,10 @@ test('MIME builder rejects invalid Reply-To and sender display-name injection',f
   catch(InvalidArgumentException $e){same(true,str_contains(strtolower($e->getMessage()),'reply-to') || str_contains(strtolower($e->getMessage()),'header'));}
  }
 });
+test('SMTP delivery exception exposes whether remote acceptance is uncertain',function(){
+ $safe=new \\App\\Services\\SmtpDeliveryException('safe failure',false);
+ $uncertain=new \\App\\Services\\SmtpDeliveryException('ambiguous DATA result',true);
+ same(false,$safe->deliveryUncertain);
+ same(true,$uncertain->deliveryUncertain);
+});
 echo "{$count} tests passed.\n";
