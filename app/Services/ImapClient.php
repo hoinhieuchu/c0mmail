@@ -84,7 +84,8 @@ final class ImapClient
             if (!$overview) throw new \RuntimeException('Message not found.');
             $item = $overview[0];
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
-            $body = $this->extractBody($stream, $uid, $structure);
+            $attachments = [];
+            $body = $this->extractBody($stream, $uid, $structure, $attachments);
             imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID);
             return [
                 'uid' => $uid,
@@ -93,10 +94,30 @@ final class ImapClient
                 'to' => $this->decodeHeader((string)($item->to ?? '')),
                 'date' => (string)($item->date ?? ''),
                 'body' => $body,
+                'attachments' => $attachments,
             ];
         } finally { imap_close($stream); }
     }
 
+    public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
+    {
+        $this->requireExtension();
+        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section)) throw new \InvalidArgumentException('Invalid attachment reference.');
+        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
+        try {
+            $raw = imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
+            if ($raw === false) throw new \RuntimeException('Attachment data could not be retrieved.');
+            if ($encoding === 3) {
+                $decoded = base64_decode($raw, true);
+                if ($decoded === false) throw new \RuntimeException('Attachment has invalid base64 encoding.');
+                $raw = $decoded;
+            } elseif ($encoding === 4) {
+                $raw = quoted_printable_decode($raw);
+            }
+            if (strlen($raw) > 25_000_000) throw new \RuntimeException('Attachment exceeds the 25 MB download limit.');
+            return $raw;
+        } finally { imap_close($stream); }
+    }
 
     public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag): void
     {
@@ -160,31 +181,43 @@ final class ImapClient
         return function_exists('imap_utf7_encode') ? imap_utf7_encode($folder) : $folder;
     }
 
-    private function extractBody($stream, int $uid, $structure): string
+    private function extractBody($stream, int $uid, $structure, array &$attachments): string
     {
         if (!$structure) return (string)imap_body($stream, $uid, FT_UID | FT_PEEK);
         $parts = [];
-        $this->collectParts($stream, $uid, $structure, '', $parts);
+        $this->collectParts($stream, $uid, $structure, '', $parts, $attachments);
         foreach ($parts as $part) if ($part['type'] === 'plain') return $part['body'];
         foreach ($parts as $part) if ($part['type'] === 'html') {
-            $text = preg_replace('/<(br|\\/p|\\/div|\\/li|\\/tr)\\b[^>]*>/i', "\n", $part['body']);
+            $text = preg_replace('/<(br|\/p|\/div|\/li|\/tr)\b[^>]*>/i', "\n", $part['body']);
             return html_entity_decode(strip_tags((string)$text), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
         return '';
     }
 
-    private function collectParts($stream, int $uid, $structure, string $section, array &$parts): void
+    private function collectParts($stream, int $uid, $structure, string $section, array &$parts, array &$attachments): void
     {
         if (!empty($structure->parts)) {
             foreach ($structure->parts as $index => $part) {
                 $partSection = $section === '' ? (string)($index + 1) : $section . '.' . ($index + 1);
-                $this->collectParts($stream, $uid, $part, $partSection, $parts);
+                $this->collectParts($stream, $uid, $part, $partSection, $parts, $attachments);
             }
             return;
         }
         $subtype = strtolower((string)($structure->subtype ?? 'plain'));
         $type = (int)($structure->type ?? 0);
-        if ($type !== TYPETEXT || !in_array($subtype, ['plain', 'html'], true)) return;
+        $filename = $this->partFilename($structure);
+        $disposition = strtolower((string)($structure->disposition ?? ''));
+        if ($filename !== '' || $disposition === 'attachment' || ($type !== 0 && $type !== 1)) {
+            $attachments[] = [
+                'section' => $section === '' ? '1' : $section,
+                'filename' => $filename !== '' ? $filename : 'attachment-' . count($attachments + []),
+                'mime' => $this->mimeType($type, $subtype),
+                'size' => (int)($structure->bytes ?? 0),
+                'encoding' => (int)($structure->encoding ?? 0),
+            ];
+            return;
+        }
+        if ($type !== 0 || !in_array($subtype, ['plain', 'html'], true)) return;
         $raw = $section === ''
             ? imap_body($stream, $uid, FT_UID | FT_PEEK)
             : imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
@@ -200,6 +233,23 @@ final class ImapClient
             $body = mb_convert_encoding($body, 'UTF-8', $charset);
         }
         $parts[] = ['type' => $subtype, 'body' => $body];
+    }
+
+    private function partFilename($structure): string
+    {
+        foreach (array_merge($structure->parameters ?? [], $structure->dparameters ?? []) as $parameter) {
+            if (in_array(strtolower((string)($parameter->attribute ?? '')), ['name', 'filename'], true)) {
+                return (string)($parameter->value ?? '');
+            }
+        }
+        return '';
+    }
+
+    private function mimeType(int $type, string $subtype): string
+    {
+        $primary = [0=>'text',1=>'multipart',2=>'message',3=>'application',4=>'audio',5=>'image',6=>'video',7=>'application'];
+        $major = $primary[$type] ?? 'application';
+        return preg_match('/^[a-z0-9.+-]+$/i', $subtype) ? $major . '/' . $subtype : 'application/octet-stream';
     }
 
     private function decodeHeader(string $value): string
