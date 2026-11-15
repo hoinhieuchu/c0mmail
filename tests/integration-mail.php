@@ -5,6 +5,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Services\ImapClient;
 use App\Services\SmtpClient;
+use App\Services\SmtpDeliveryException;
 
 function integrationCheck(bool $condition, string $message): void
 {
