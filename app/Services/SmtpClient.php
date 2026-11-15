@@ -42,12 +42,25 @@ final class SmtpClient
             $this->command($socket, 'MAIL FROM:<' . $from . '>', [250]);
             foreach ($envelopeRecipients as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
+            $phase = 'data';
             $wireMessage = preg_replace('/(?m)^\./', '..', str_replace(["\r\n", "\r"], "\n", $message));
             $this->writeAll($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
             $this->expect($socket, [250]);
+            $phase = 'accepted';
             try { $this->command($socket, 'QUIT', [221]); }
             catch (\Throwable $quitError) { error_log('SMTP QUIT failed after message acceptance.'); }
             return $message;
+        } catch (SmtpDeliveryException $e) {
+            throw $e;
+        } catch (\\Throwable $e) {
+            $uncertain = $phase === 'data';
+            throw new SmtpDeliveryException(
+                $uncertain
+                    ? 'SMTP response was inconclusive after message DATA was submitted.'
+                    : 'SMTP delivery failed before the message DATA phase.',
+                $uncertain,
+                $e
+            );
         } finally { fclose($socket); }
     }
 
