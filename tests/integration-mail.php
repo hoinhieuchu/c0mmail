@@ -95,6 +95,27 @@ for ($attempt = 0; $attempt < 20; $attempt++) {
 }
 integrationCheck($capturedStartTlsMessage, 'SMTP STARTTLS server receives the authenticated message after TLS upgrade');
 
+$rejectSettings = $startTlsSettings;
+$rejectSettings['smtp_port'] = (int)(getenv('SMTP_REJECT_PORT') ?: 3588);
+try {
+    $smtp->send($rejectSettings, $credentials, $credentials['email'], [$credentials['email']],
+        $subject . ' explicit rejection', 'Rejected after DATA', null, []);
+    throw new RuntimeException('Expected an explicit SMTP 550 rejection after DATA.');
+} catch (SmtpDeliveryException $e) {
+    integrationCheck(!$e->deliveryUncertain, 'Explicit SMTP 5xx after DATA is classified as definitive rejection');
+}
+
+$dropSettings = $startTlsSettings;
+$dropSettings['smtp_port'] = (int)(getenv('SMTP_DROP_PORT') ?: 3589);
+try {
+    $smtp->send($dropSettings, $credentials, $credentials['email'], [$credentials['email']],
+        $subject . ' lost final reply', 'Connection dropped after DATA', null, []);
+    throw new RuntimeException('Expected SMTP connection loss after DATA.');
+} catch (SmtpDeliveryException $e) {
+    integrationCheck($e->deliveryUncertain, 'Connection loss after DATA is classified as uncertain delivery');
+}
+
+
 $messages = [];
 for ($attempt = 0; $attempt < 30; $attempt++) {
     $messages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
