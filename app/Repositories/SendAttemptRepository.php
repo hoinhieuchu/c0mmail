@@ -39,12 +39,12 @@ final class SendAttemptRepository
         );
         $stale->execute([$submissionId, $userId, $mailboxId]);
 
-        // The unique token and conditional UPDATE make the claim atomic across
-        // PHP workers and across browser sessions.
+        // Pending tokens are claimed once. Failed tokens may be reclaimed only
+        // when the exact original payload fingerprint and Message-ID still match.
         $claim = $this->db->prepare(
             "UPDATE mail_send_attempts
              SET status='sending', payload_hash=?, message_id=?, updated_at=CURRENT_TIMESTAMP
-             WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status IN ('pending','failed')"
+             WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status='pending'"
         );
         $claim->execute([$payloadHash, $messageId, $submissionId, $userId, $mailboxId]);
         if ($claim->rowCount() === 1) {
@@ -57,6 +57,19 @@ final class SendAttemptRepository
         }
         if (!empty($attempt['payload_hash']) && !hash_equals((string)$attempt['payload_hash'], $payloadHash)) {
             throw new InvalidArgumentException('This send token was already used for different message content. Reload Webmail before sending.');
+        }
+
+        if (($attempt['status'] ?? '') === 'failed') {
+            $retry = $this->db->prepare(
+                "UPDATE mail_send_attempts SET status='sending', updated_at=CURRENT_TIMESTAMP
+                 WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status='failed'
+                   AND payload_hash=? AND message_id=?"
+            );
+            $retry->execute([$submissionId, $userId, $mailboxId, $payloadHash, $messageId]);
+            if ($retry->rowCount() === 1) {
+                return ['status'=>'sending', 'claimed'=>true, 'payload_hash'=>$payloadHash, 'message_id'=>$messageId];
+            }
+            $attempt = $this->find($submissionId, $userId, $mailboxId) ?? $attempt;
         }
         return $attempt;
     }
