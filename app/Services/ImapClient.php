@@ -130,7 +130,8 @@ final class ImapClient
         $encryption = strtolower((string)($settings['imap_encryption'] ?? 'ssl'));
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('IMAP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid IMAP port.');
-        $flags = $encryption === 'ssl' ? '/imap/ssl' : ($encryption === 'starttls' ? '/imap/tls' : '/imap');
+        if (!in_array($encryption, ['ssl', 'starttls'], true)) throw new \\RuntimeException('IMAP connections must use SSL or STARTTLS.');
+        $flags = $encryption === 'ssl' ? '/imap/ssl' : '/imap/tls';
         return '{' . $host . ':' . $port . $flags . '}';
     }
 
