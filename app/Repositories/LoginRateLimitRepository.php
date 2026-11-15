@@ -41,9 +41,9 @@ final class LoginRateLimitRepository
         $this->increment($ipHash, self::IP_LIMIT);
     }
 
-    public function clear(string $email, string $ip): void
+    public function clearAccount(string $email): void
     {
-        [$emailHash, $ipHash] = $this->keyHashes($email, $ip);
+        $emailHash = hash_hmac('sha256', 'email:' . strtolower(trim($email)), $this->applicationKey);
         $stmt = $this->db->prepare('DELETE FROM login_rate_limits WHERE key_hash = ?');
         $stmt->execute([$emailHash]);
         $this->db->exec(
