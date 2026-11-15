@@ -54,7 +54,7 @@ final class SmtpClient
     {
         while ($data !== '') {
             $written = fwrite($socket, $data);
-            if ($written === false || $written === 0) throw new \\RuntimeException('SMTP socket write failed.');
+            if ($written === false || $written === 0) throw new \RuntimeException('SMTP socket write failed.');
             $data = (string)substr($data, $written);
         }
     }
