@@ -3,7 +3,7 @@ declare(strict_types=1);
 use App\Core\Auth;use App\Core\Config;use App\Core\Database;use App\Core\Router;use App\Core\View;
 use App\Controllers\AuthController;use App\Controllers\DashboardController;use App\Controllers\AdminMailboxController;use App\Controllers\WebmailController;
 use App\Providers\LocalSessionMemberProvider;use App\Providers\ManualMailProvider;use App\Providers\CraneMailProvider;
-use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
+use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Repositories\SendAttemptRepository;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
 require dirname(__DIR__).'/app/bootstrap.php';
 $config=Config::load(dirname(__DIR__).'/.env');
 $isProduction = $config->get('APP_ENV') === 'production';
@@ -32,7 +32,7 @@ header('Cache-Control: private, no-store, max-age=0');
 if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
     header('Strict-Transport-Security: max-age=31536000');
 }
-$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);$sendAttempts=new SendAttemptRepository($db);
+$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);$sendAttempts=new SendAttemptRepository($db);$sendAttempts=new SendAttemptRepository($db);
 $auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
