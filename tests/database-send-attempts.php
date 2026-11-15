@@ -16,7 +16,7 @@ $db = new PDO(
     [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES=>false]
 );
 
-foreach (['001_initial_schema.sql', '002_mail_send_attempts.sql', '003_send_attempt_failed_state.sql'] as $migration) {
+foreach (['001_initial_schema.sql', '002_mail_send_attempts.sql', '003_send_attempt_failed_state.sql', '004_login_rate_limits.sql'] as $migration) {
     $sql = file_get_contents(dirname(__DIR__) . '/database/migrations/' . $migration);
     if ($sql === false) throw new RuntimeException('Unable to read migration ' . $migration);
     foreach (explode(';', $sql) as $statement) {
@@ -32,12 +32,21 @@ $insertMailbox = $db->prepare("INSERT INTO mailboxes (user_id,email,display_name
 $insertMailbox->execute([$userId, "mailbox-{$suffix}@example.test"]);
 $mailboxId = (int)$db->lastInsertId();
 $repo = new SendAttemptRepository($db);
+$loginLimits = new LoginRateLimitRepository($db, 'ci-login-rate-limit-secret');
 $check = static function (bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);
     echo "PASS {$message}\n";
 };
 
 try {
+    for ($i = 0; $i < 10; $i++) $loginLimits->recordFailure('blocked@example.test', '192.0.2.10');
+    $check($loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'repeated password failures block the account key');
+    $loginLimits->clear('blocked@example.test', '192.0.2.10');
+    $check(!$loginLimits->isBlocked('blocked@example.test', '192.0.2.10'), 'successful authentication clears account and IP throttles');
+
+    for ($i = 0; $i < 30; $i++) $loginLimits->recordFailure('spray-' . $i . '@example.test', '198.51.100.10');
+    $check($loginLimits->isBlocked('spray-final@example.test', '198.51.100.10'), 'distributed account guessing from one IP trips the IP throttle');
+
     $token = bin2hex(random_bytes(16));
     $hash = hash('sha256', 'stable payload');
     $messageId = "<{$token}@c0m.me>";
@@ -101,6 +110,7 @@ try {
     $check($repo->find($expiredToken, $userId, $mailboxId) === null, 'old send-attempt records are purged during compose-token creation');
 } finally {
     $db->prepare('DELETE FROM mail_send_attempts WHERE user_id=?')->execute([$userId]);
+    $db->exec('DELETE FROM login_rate_limits');
     $db->prepare('DELETE FROM mailboxes WHERE user_id=?')->execute([$userId]);
     $db->prepare('DELETE FROM users WHERE id=?')->execute([$userId]);
 }
