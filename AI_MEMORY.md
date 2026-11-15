@@ -32,6 +32,7 @@
 - Webmail view and action errors are mapped to user-safe messages; detailed server exception text is not rendered.
 - Attachment downloads verify the requested folder against the authenticated mailbox's discovered folders.
 - The MIME header fallback emits folded RFC 2047 encoded-words when mbstring's encoder is unavailable.
+- The IMAP APPEND cap accounts for base64 expansion of the 25 MB aggregate attachment limit; PHP upload memory guidance is 192 MB.
 - Submission idempotency is session-scoped, not durable across session expiry or a lost session store; database-backed delivery idempotency remains a future hardening task.
 - PHP sessions use strict mode, cookie-only transport, HttpOnly/SameSite cookies, 30-minute idle timeout and 12-hour absolute timeout.
 - Global response headers include CSP, anti-framing, MIME sniffing protection, referrer policy, private no-store caching, and HSTS on HTTPS. CSP-compatible UI behavior is delegated to the same-origin JavaScript asset; the public .user.ini is denied by Apache.

@@ -138,6 +138,7 @@ final class ImapClient
             if (!$overview) throw new \RuntimeException('Message not found.');
             $item = $overview[0];
             $structure = imap_fetchstructure($stream, $uid, FT_UID);
+            if ($structure === false) throw new \RuntimeException('Message MIME structure could not be retrieved.');
             $attachments = [];
             $body = $this->extractBody($stream, $uid, $structure, $attachments);
             if (!imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID)) {
@@ -164,7 +165,9 @@ final class ImapClient
     public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
     {
         $this->requireExtension();
-        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section)) throw new \InvalidArgumentException('Invalid attachment reference.');
+        if ($uid < 1 || !preg_match('/^\d+(?:\.\d+)*$/', $section) || !in_array($encoding, [0, 1, 2, 3, 4], true)) {
+            throw new \InvalidArgumentException('Invalid attachment reference.');
+        }
         self::validateFolderName($folder);
         $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
         try {
@@ -187,7 +190,8 @@ final class ImapClient
         $this->requireExtension();
         self::validateFolderName($folder);
         if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \InvalidArgumentException('Unsupported IMAP message flag.');
-        if (strlen($raw) > 30_000_000 || !str_contains($raw, "\r\n\r\n")) throw new \InvalidArgumentException('Invalid or oversized RFC message.');
+        // A 25 MB binary attachment set expands to roughly 33.4 MB after base64.
+        if (strlen($raw) > 40_000_000 || !str_contains($raw, "\r\n\r\n")) throw new \InvalidArgumentException('Invalid or oversized RFC message.');
         $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
         try {
             $target = $this->prefix($settings) . $this->encodeFolder($folder);
