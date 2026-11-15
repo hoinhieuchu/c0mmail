@@ -121,4 +121,5 @@ test('SMTP connection loss without a final reply is not misclassified as a negat
  catch(\RuntimeException $e){same(true,str_contains($e->getMessage(),'closed the connection'));}
  finally{fclose($pair[0]);}
 });
+test('login rate-limit repository autoloads',function(){same(true,class_exists(\\App\\Repositories\\LoginRateLimitRepository::class));});
 echo "{$count} tests passed.\n";
