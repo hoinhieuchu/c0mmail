@@ -130,6 +130,21 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
+
+    public function setFlag(array $settings, array $credentials, string $folder, int $uid, string $flag, bool $enabled): void
+    {
+        $this->requireExtension();
+        if ($uid < 1 || !in_array($flag, ['Seen', 'Flagged'], true)) throw new \InvalidArgumentException('Unsupported message flag operation.');
+        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, 0);
+        try {
+            $flags = '\\' . $flag;
+            $ok = $enabled
+                ? imap_setflag_full($stream, (string)$uid, $flags, ST_UID)
+                : imap_clearflag_full($stream, (string)$uid, $flags, ST_UID);
+            if (!$ok) throw new \RuntimeException('Unable to update message flags: ' . $this->lastError());
+        } finally { imap_close($stream); }
+    }
+
     public function move(array $settings, array $credentials, string $source, int $uid, string $destination): void
     {
         $this->requireExtension();
