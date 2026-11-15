@@ -82,10 +82,10 @@ final class ImapClient
     public function appendTextMessage(array $settings, array $credentials, string $folder, string $from, array $recipients, string $subject, string $body, string $flag): void
     {
         $this->requireExtension();
-        if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \\InvalidArgumentException('Unsupported IMAP message flag.');
-        foreach ([$from, $subject] as $header) if (preg_match('/[\r\n\0]/', $header)) throw new \\InvalidArgumentException('Invalid message header.');
-        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \\InvalidArgumentException('Invalid sender address.');
-        foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \\InvalidArgumentException('Invalid recipient address.');
+        if (!in_array($flag, ['\Seen', '\Draft'], true)) throw new \InvalidArgumentException('Unsupported IMAP message flag.');
+        foreach ([$from, $subject] as $header) if (preg_match('/[\r\n\0]/', $header)) throw new \InvalidArgumentException('Invalid message header.');
+        if (!filter_var($from, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid sender address.');
+        foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid recipient address.');
         $stream = $this->open($this->prefix($settings) . 'INBOX', $credentials, 0);
         try {
             $headers = [
