@@ -5,7 +5,7 @@ namespace App\Services;
 /** Minimal authenticated SMTP client with STARTTLS/implicit TLS and MIME text bodies. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = []): void
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = []): string
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -39,6 +39,7 @@ final class SmtpClient
             fwrite($socket, str_replace("\n", "\r\n", $message) . "\r\n.\r\n");
             $this->expect($socket, [250]);
             $this->command($socket, 'QUIT', [221]);
+            return $message;
         } finally { fclose($socket); }
     }
 
