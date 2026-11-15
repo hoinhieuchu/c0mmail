@@ -148,9 +148,37 @@ $imap->appendRawMessage($settings, $credentials, 'Drafts', $rawMessage, '\\Draft
 $drafts = $imap->listMessages($settings, $credentials, 'Drafts', 10, 0, $subject);
 integrationCheck(count($drafts) === 1, 'IMAP APPEND to Drafts folder');
 
+$protectedSubject = 'c0mmail unrelated deleted ' . bin2hex(random_bytes(4));
+$protectedRaw = \App\Services\MimeMessageBuilder::build(
+    $credentials['email'], [$credentials['email']], $protectedSubject, 'Unrelated message already marked deleted'
+);
+$imap->appendRawMessage($settings, $credentials, 'INBOX', $protectedRaw, '\\Seen');
+$protectedRows = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $protectedSubject);
+if (count($protectedRows) !== 1) throw new RuntimeException('Unable to create unrelated pre-deleted test message.');
+$protectedUid = (int)$protectedRows[0]['uid'];
+$inboxPrefix = '{localhost:3993/imap/ssl}';
+$deleteStream = @imap_open($inboxPrefix . 'INBOX', $credentials['email'], $credentials['password'], 0);
+if ($deleteStream === false) throw new RuntimeException('Unable to open INBOX for pre-delete safety test.');
+try {
+    if (!imap_setflag_full($deleteStream, (string)$protectedUid, '\\Deleted', ST_UID)) {
+        throw new RuntimeException('Unable to mark unrelated test message as deleted.');
+    }
+} finally {
+    imap_close($deleteStream);
+}
+
 $imap->move($settings, $credentials, 'INBOX', $uid, 'Trash');
 $inboxAfterMove = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
 $trash = $imap->listMessages($settings, $credentials, 'Trash', 10, 0, $subject);
+$verifyStream = @imap_open($inboxPrefix . 'INBOX', $credentials['email'], $credentials['password'], OP_READONLY);
+if ($verifyStream === false) throw new RuntimeException('Unable to verify unrelated deleted message retention.');
+try {
+    $deletedUids = imap_search($verifyStream, 'DELETED', SE_UID) ?: [];
+} finally {
+    imap_close($verifyStream);
+}
+integrationCheck(in_array($protectedUid, array_map('intval', $deletedUids), true), 'IMAP MOVE preserves unrelated messages already marked Deleted');
+
 integrationCheck($inboxAfterMove === [], 'IMAP MOVE removes the message from source search');
 integrationCheck(count($trash) === 1, 'IMAP MOVE places the message in destination folder');
 
