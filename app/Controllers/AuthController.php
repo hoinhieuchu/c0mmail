@@ -6,12 +6,33 @@ use App\Core\View;
 use App\Repositories\UserRepository;
 final class AuthController
 {
-    public function __construct(private UserRepository $users,private View $view){}
+    public function __construct(private UserRepository $users, private LoginRateLimitRepository $loginLimits, private View $view){}
     public function showLogin():void{$this->view->render('login',['title'=>'Sign in','error'=>null]);}
     public function login():void
     {
-        Csrf::verify();$email=strtolower(trim((string)($_POST['email']??'')));$password=(string)($_POST['password']??'');$u=$this->users->findByEmail($email);
-        if(!$u||$u['status']!=='active'||!password_verify($password,$u['password_hash'])){$this->view->render('login',['title'=>'Sign in','error'=>'Email or password is incorrect.']);return;}
+        Csrf::verify();
+        $email = strtolower(trim((string)($_POST['email'] ?? '')));
+        $password = (string)($_POST['password'] ?? '');
+        $ip = filter_var($_SERVER['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP) ?: 'unknown';
+
+        if ($this->loginLimits->isBlocked($email, $ip)) {
+            $this->view->render('login', ['title'=>'Sign in', 'error'=>'Too many sign-in attempts. Try again in 15 minutes.']);
+            return;
+        }
+
+        $validEmail = strlen($email) <= 254 && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+        $u = $validEmail ? $this->users->findByEmail($email) : null;
+        // Verify a fixed dummy hash for unknown/invalid accounts to reduce timing-based enumeration.
+        $dummyHash = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+        $passwordValid = password_verify($password, (string)($u['password_hash'] ?? $dummyHash));
+
+        if (!$u || $u['status'] !== 'active' || !$passwordValid) {
+            $this->loginLimits->recordFailure($email, $ip);
+            $this->view->render('login', ['title'=>'Sign in', 'error'=>'Email or password is incorrect.']);
+            return;
+        }
+
+        $this->loginLimits->clear($email, $ip);
         session_regenerate_id(true);
         $_SESSION = [
             '_csrf' => bin2hex(random_bytes(32)),
