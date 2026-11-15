@@ -6,3 +6,5 @@ textarea{display:block;width:100%;min-height:160px;padding:12px;border:1px solid
 .message-actions{display:flex;gap:16px;margin:12px 0}.message-actions a{color:#2457c5;text-decoration:none;font-weight:600}.message-actions a:hover{text-decoration:underline}
 
 .rich-compose{margin:14px 0}.rich-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.rich-toolbar button{padding:6px 10px}.rich-editor{min-height:180px;padding:12px;border:1px solid #cbd3e1;border-radius:7px;background:#fff;outline:none;line-height:1.55;overflow-wrap:anywhere}.rich-editor:focus{border-color:#2457c5;box-shadow:0 0 0 2px #2457c51a}.rich-editor:empty:before{content:attr(data-placeholder);color:#718096;pointer-events:none}.conversation-list{border:1px solid #e0e5ef;border-radius:8px;padding:12px;margin:14px 0}.conversation-list h3{font-size:15px;margin:0 0 8px}.conversation-list ul{margin:0;padding-left:18px}.conversation-list li{padding:4px 0}.conversation-list a{color:#2457c5;text-decoration:none}
+
+.rich-source{display:none}
