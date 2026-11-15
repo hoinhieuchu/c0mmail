@@ -6,7 +6,7 @@
 - `app/Core`: configuration, PDO connection, router, view, CSRF, and authentication primitives.
 - `app/Controllers`: HTTP orchestration.
 - `app/Repositories`: parameterized SQL persistence.
-- `app/Services`: mailbox lifecycle and encryption boundary.
+- `app/Services`: mailbox lifecycle, encrypted credential access, IMAP client, and SMTP transport.
 - `app/Contracts`: replaceable identity and mail-provider contracts.
 - `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
 
@@ -31,6 +31,14 @@ This contract is an integration boundary, not a claim that CraneMail's productio
 
 Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_KEY`; only ciphertext, nonce, and tag are stored. The initial password is shown once to the administrator after creation for secure handoff. The application does not offer a later password reveal.
 
+## Webmail transport
+
+- `ImapClient` uses PHP's IMAP extension and the configured IMAP host, port, and encryption mode. It discovers server folders, lists the latest messages by UID, reads text/plain (or text/html fallback) bodies, marks opened messages as seen, appends Sent/Drafts messages, and moves messages by UID.
+- `SmtpClient` uses authenticated SMTP over implicit TLS or STARTTLS, validates recipients and header values, and sends UTF-8 plain-text messages. The webmail controller appends a copy to the server's Sent folder when one is discoverable.
+- Mailbox credentials are decrypted only after the authenticated user is verified as the mailbox owner and the mailbox is active. Credentials are never returned to templates or browser JavaScript.
+- IMAP certificate verification remains enabled. Configure valid certificates on the mail server; do not disable peer verification to work around certificate errors.
+- Folder names are discovered from the IMAP server. Draft and Sent operations are enabled only when matching server folders exist. Trash/Spam moves require those folders to exist.
+
 ## Deliberate exclusions
 
-This foundation does not yet implement SMTP send operations or IMAP folder/message retrieval in the browser; it provides connection settings for external mail clients. It also does not run an MTA/IMAP daemon, password-reset email, billing, domain verification, or OIDC flow. These require verified provider capabilities and operational policies.
+The application does not run an MTA/IMAP daemon. Current webmail is plain-text compose and text-body reading; MIME attachments, rich HTML composition, full-text search, robust pagination, conversation threading, push/IDLE sync, password-reset email, billing, domain verification, and OIDC remain future work. CraneMail's actual IMAP/SMTP endpoints and authentication policies must be verified in the target environment before production use.
