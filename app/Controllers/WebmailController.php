@@ -71,6 +71,7 @@ final class WebmailController
             $hasMore = count($messages) > 50;
             $messages = array_slice($messages, 0, 50);
             $oldestUid = $messages ? min(array_map(static fn(array $message): int => (int)$message['uid'], $messages)) : 0;
+            $latestUid = $messages ? max(array_map(static fn(array $message): int => (int)$message['uid'], $messages)) : 0;
             $messages = ConversationGrouper::group($messages);
             $selected = null;
             $relatedMessages = [];
@@ -107,7 +108,7 @@ final class WebmailController
                 'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
                 'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
                 'selectedMessage'=>$selected,'error'=>null,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
-                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'oldestUid'=>$oldestUid,'relatedMessages'=>$relatedMessages,'compose'=>$compose,
+                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'oldestUid'=>$oldestUid,'latestUid'=>$latestUid,'relatedMessages'=>$relatedMessages,'compose'=>$compose,
             ]);
         } catch (\Throwable $e) {
             error_log('Webmail mailbox view failed: ' . get_class($e));
@@ -218,7 +219,7 @@ final class WebmailController
 
     public function updates(): void
     {
-        $this->auth->requireLogin();
+        $user = $this->auth->requireLogin();
         header('Content-Type: application/json; charset=UTF-8');
         header('Cache-Control: private, no-store, max-age=0');
 
@@ -241,7 +242,7 @@ final class WebmailController
                 throw new \InvalidArgumentException('Invalid synchronization request.');
             }
 
-            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$this->auth->user()['id']);
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $folderNames = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
             if (!in_array($folder, $folderNames, true)) {
                 http_response_code(404);
