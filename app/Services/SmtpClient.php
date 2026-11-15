@@ -5,7 +5,7 @@ namespace App\Services;
 /** Minimal authenticated SMTP client with STARTTLS/implicit TLS and MIME text bodies. */
 final class SmtpClient
 {
-    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = []): string
+    public function send(array $settings, array $credentials, string $from, array $recipients, string $subject, string $body, ?string $htmlBody = null, array $attachments = [], array $threadHeaders = []): string
     {
         $host = (string)($settings['smtp_host'] ?? '');
         $port = (int)($settings['smtp_port'] ?? 587);
@@ -14,7 +14,7 @@ final class SmtpClient
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid SMTP port.');
         if (!in_array($mode, ['ssl', 'starttls'], true)) throw new \RuntimeException('SMTP connections must use SSL or STARTTLS.');
         if (!$recipients) throw new \InvalidArgumentException('At least one recipient is required.');
-        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments);
+        $message = MimeMessageBuilder::build($from, array_values(array_unique($recipients)), $subject, $body, $htmlBody, $attachments, $threadHeaders);
         $target = ($mode === 'ssl' ? 'ssl://' : 'tcp://') . $host . ':' . $port;
         $socket = @stream_socket_client($target, $errno, $error, 20, STREAM_CLIENT_CONNECT);
         if (!$socket) throw new \RuntimeException('SMTP connection failed: ' . $error . ' (' . $errno . ').');
