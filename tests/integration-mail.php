@@ -62,7 +62,7 @@ integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS d
 
 $startTlsSettings = $settings;
 $startTlsSettings['smtp_port'] = 3025;
-$startTlsSettings['smtp_encryption'] = 'tls';
+$startTlsSettings['smtp_encryption'] = 'starttls';
 $startTlsSubject = $subject . ' STARTTLS';
 $startTlsRaw = $smtp->send(
     $startTlsSettings,
