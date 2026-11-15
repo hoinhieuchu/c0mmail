@@ -100,7 +100,7 @@ final class ImapClient
             ];
             $raw = implode("\\r\\n", $headers) . "\\r\\n\\r\\n" . quoted_printable_encode(str_replace(["\\r\\n", "\\r"], "\\n", $body)) . "\\r\\n";
             $target = $this->prefix($settings) . $this->encodeFolder($folder);
-            if (!imap_append($stream, $target, $raw, $flag)) throw new \\RuntimeException('Unable to save message to IMAP folder: ' . $this->lastError());
+            if (!imap_append($stream, $target, $raw, $flag)) throw new \RuntimeException('Unable to save message to IMAP folder: ' . $this->lastError());
         } finally { imap_close($stream); }
     }
 
@@ -130,7 +130,7 @@ final class ImapClient
         $encryption = strtolower((string)($settings['imap_encryption'] ?? 'ssl'));
         if ($host === '' || !preg_match('/^[a-zA-Z0-9.-]+$/', $host)) throw new \RuntimeException('IMAP host is not configured correctly.');
         if ($port < 1 || $port > 65535) throw new \RuntimeException('Invalid IMAP port.');
-        if (!in_array($encryption, ['ssl', 'starttls'], true)) throw new \\RuntimeException('IMAP connections must use SSL or STARTTLS.');
+        if (!in_array($encryption, ['ssl', 'starttls'], true)) throw new \RuntimeException('IMAP connections must use SSL or STARTTLS.');
         $flags = $encryption === 'ssl' ? '/imap/ssl' : '/imap/tls';
         return '{' . $host . ':' . $port . $flags . '}';
     }
