@@ -85,7 +85,8 @@ final class WebmailController
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $to = preg_split('/[,;]+/', (string)($_POST['to'] ?? ''), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $recipients = array_values(array_unique(array_filter(array_map('trim', $to), static fn(string $v): bool => filter_var($v, FILTER_VALIDATE_EMAIL) !== false)));
+            $recipients = array_values(array_unique(array_map('trim', $to)));
+            foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \\InvalidArgumentException('Invalid draft recipient address.');
             $subject = trim((string)($_POST['subject'] ?? ''));
             $body = (string)($_POST['body'] ?? '');
             if (strlen($subject) > 998 || strlen($body) > 2_000_000) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
