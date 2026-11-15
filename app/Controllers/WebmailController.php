@@ -432,7 +432,6 @@ final class WebmailController
         if (isset($_POST['mailbox_id'])) $_GET['mailbox'] = (string)(int)$_POST['mailbox_id'];
         $_GET['folder'] = (string)($_POST['folder'] ?? $_POST['source'] ?? 'INBOX');
         if (isset($_POST['q'])) $_GET['q'] = (string)$_POST['q'];
-        if (isset($_POST['uid'])) $_GET['uid'] = (string)(int)$_POST['uid'];
         unset($_GET['compose']);
 
         $compose = [
