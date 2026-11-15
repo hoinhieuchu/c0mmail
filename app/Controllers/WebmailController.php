@@ -102,7 +102,7 @@ final class WebmailController
         foreach ($folders as $folder) {
             $name = strtolower((string)$folder['name']);
             foreach ($candidates as $candidate) {
-                if ($name === $candidate || str_ends_with($name, '.' . $candidate)) return (string)$folder['name'];
+                if ($name === $candidate || str_ends_with($name, '.' . $candidate) || str_ends_with($name, '/' . $candidate)) return (string)$folder['name'];
             }
         }
         return null;
