@@ -60,6 +60,22 @@ $rawMessage = $smtp->send(
 );
 integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS delivery returns the exact MIME payload');
 
+$startTlsSettings = $settings;
+$startTlsSettings['smtp_port'] = 3025;
+$startTlsSettings['smtp_encryption'] = 'tls';
+$startTlsSubject = $subject . ' STARTTLS';
+$startTlsRaw = $smtp->send(
+    $startTlsSettings,
+    $credentials,
+    $credentials['email'],
+    [$credentials['email']],
+    $startTlsSubject,
+    'STARTTLS integration body',
+    null,
+    []
+);
+integrationCheck(str_contains($startTlsRaw, 'Message-ID:'), 'GreenMail SMTP STARTTLS delivery');
+
 $messages = [];
 for ($attempt = 0; $attempt < 30; $attempt++) {
     $messages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
@@ -67,6 +83,13 @@ for ($attempt = 0; $attempt < 30; $attempt++) {
     usleep(200_000);
 }
 integrationCheck(count($messages) === 1, 'SMTP-delivered message appears in IMAP INBOX');
+$startTlsMessages = [];
+for ($attempt = 0; $attempt < 30; $attempt++) {
+    $startTlsMessages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $startTlsSubject);
+    if ($startTlsMessages) break;
+    usleep(200_000);
+}
+integrationCheck(count($startTlsMessages) === 1, 'STARTTLS-delivered message appears in IMAP INBOX');
 $uid = (int)$messages[0]['uid'];
 $message = $imap->getMessage($settings, $credentials, 'INBOX', $uid);
 integrationCheck(str_contains($message['body'], 'Plain-text integration body'), 'IMAP MIME plain-text body retrieval');

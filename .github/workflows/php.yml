@@ -51,14 +51,16 @@ jobs:
             if timeout 3 openssl s_client -connect 127.0.0.1:3993 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-imaps.log 2>&1 \
               && timeout 3 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
-                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1; then
+                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1 \
+              && timeout 3 openssl s_client -starttls smtp -connect 127.0.0.1:3025 -servername localhost \
+                -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-starttls.log 2>&1; then
               ready=1
               break
             fi
             sleep 1
           done
           if [ "$ready" -ne 1 ]; then
-            cat /tmp/greenmail-imaps.log /tmp/greenmail-smtps.log || true
+            cat /tmp/greenmail-imaps.log /tmp/greenmail-smtps.log /tmp/greenmail-starttls.log || true
             docker logs greenmail
             exit 1
           fi
