@@ -36,7 +36,7 @@ final class SmtpClient
             foreach (array_unique($recipients) as $recipient) $this->command($socket, 'RCPT TO:<' . $recipient . '>', [250, 251]);
             $this->command($socket, 'DATA', [354]);
             $wireMessage = preg_replace('/(?m)^\./', '..', str_replace(["\r\n", "\r"], "\n", $message));
-            fwrite($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
+            $this->writeAll($socket, str_replace("\n", "\r\n", $wireMessage) . "\r\n.\r\n");
             $this->expect($socket, [250]);
             $this->command($socket, 'QUIT', [221]);
             return $message;
@@ -45,8 +45,18 @@ final class SmtpClient
 
     private function command($socket, string $command, array $expected): string
     {
-        fwrite($socket, $command . "\r\n");
+        $this->writeAll($socket, $command . "\r\n");
         return $this->expect($socket, $expected);
+    }
+
+
+    private function writeAll($socket, string $data): void
+    {
+        while ($data !== '') {
+            $written = fwrite($socket, $data);
+            if ($written === false || $written === 0) throw new \\RuntimeException('SMTP socket write failed.');
+            $data = (string)substr($data, $written);
+        }
     }
 
     private function expect($socket, array $expected): string
