@@ -61,9 +61,11 @@ $rawMessage = $smtp->send(
 integrationCheck(str_contains($rawMessage, 'Message-ID:'), 'GreenMail SMTP TLS delivery returns the exact MIME payload');
 
 $startTlsSettings = $settings;
-$startTlsSettings['smtp_port'] = 3025;
+$startTlsSettings['smtp_port'] = (int)(getenv('STARTTLS_SMTP_PORT') ?: 3587);
 $startTlsSettings['smtp_encryption'] = 'starttls';
 $startTlsSubject = $subject . ' STARTTLS';
+$startTlsCapture = (string)(getenv('STARTTLS_SMTP_CAPTURE') ?: '/tmp/c0mmail-starttls.eml');
+@unlink($startTlsCapture);
 $startTlsRaw = $smtp->send(
     $startTlsSettings,
     $credentials,
@@ -74,7 +76,19 @@ $startTlsRaw = $smtp->send(
     null,
     []
 );
-integrationCheck(str_contains($startTlsRaw, 'Message-ID:'), 'GreenMail SMTP STARTTLS delivery');
+integrationCheck(str_contains($startTlsRaw, 'Message-ID:'), 'SMTP STARTTLS delivery returns the exact MIME payload');
+$capturedStartTlsMessage = false;
+for ($attempt = 0; $attempt < 20; $attempt++) {
+    if (is_file($startTlsCapture)) {
+        $captured = (string)file_get_contents($startTlsCapture);
+        if (str_contains($captured, $startTlsSubject) && str_contains($captured, 'STARTTLS integration body')) {
+            $capturedStartTlsMessage = true;
+            break;
+        }
+    }
+    usleep(100_000);
+}
+integrationCheck($capturedStartTlsMessage, 'SMTP STARTTLS server receives the authenticated message after TLS upgrade');
 
 $messages = [];
 for ($attempt = 0; $attempt < 30; $attempt++) {
@@ -83,13 +97,6 @@ for ($attempt = 0; $attempt < 30; $attempt++) {
     usleep(200_000);
 }
 integrationCheck(count($messages) === 1, 'SMTP-delivered message appears in IMAP INBOX');
-$startTlsMessages = [];
-for ($attempt = 0; $attempt < 30; $attempt++) {
-    $startTlsMessages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $startTlsSubject);
-    if ($startTlsMessages) break;
-    usleep(200_000);
-}
-integrationCheck(count($startTlsMessages) === 1, 'STARTTLS-delivered message appears in IMAP INBOX');
 $uid = (int)$messages[0]['uid'];
 $message = $imap->getMessage($settings, $credentials, 'INBOX', $uid);
 integrationCheck(str_contains($message['body'], 'Plain-text integration body'), 'IMAP MIME plain-text body retrieval');
