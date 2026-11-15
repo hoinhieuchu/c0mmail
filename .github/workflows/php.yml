@@ -52,7 +52,7 @@ jobs:
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-imaps.log 2>&1 \
               && timeout 3 openssl s_client -connect 127.0.0.1:3465 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief </dev/null >/tmp/greenmail-smtps.log 2>&1 \
-              && printf 'QUIT\\r\\n' | timeout 3 openssl s_client -starttls smtp -connect 127.0.0.1:3025 -servername localhost \
+              && printf 'QUIT\r\n' | timeout 3 openssl s_client -starttls smtp -connect 127.0.0.1:3025 -servername localhost \
                 -CAfile /etc/ssl/certs/ca-certificates.crt -verify_return_error -brief >/tmp/greenmail-starttls.log 2>&1; then
               ready=1
               break
