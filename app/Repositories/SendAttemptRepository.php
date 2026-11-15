@@ -35,7 +35,7 @@ final class SendAttemptRepository
         $stale = $this->db->prepare(
             "UPDATE mail_send_attempts SET status='uncertain'
              WHERE submission_id=? AND user_id=? AND mailbox_id=? AND status='sending'
-               AND updated_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 2 MINUTE)"
+               AND updated_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 15 MINUTE)"
         );
         $stale->execute([$submissionId, $userId, $mailboxId]);
 
