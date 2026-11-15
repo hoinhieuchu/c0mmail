@@ -333,21 +333,68 @@ final class ImapClient
     private function partFilename($structure): string
     {
         $parameters = array_merge($structure->parameters ?? [], $structure->dparameters ?? []);
-        foreach (['filename*', 'name*', 'filename', 'name'] as $wanted) {
-            foreach ($parameters as $parameter) {
-                if (strtolower((string)($parameter->attribute ?? '')) !== $wanted) continue;
-                $value = (string)($parameter->value ?? '');
-                if (str_ends_with($wanted, '*') && preg_match("/^([^']*)'[^']*'(.*)$/", $value, $match)) {
-                    $charset = $match[1] !== '' ? $match[1] : 'UTF-8';
-                    $value = rawurldecode($match[2]);
-                    if (strtoupper($charset) !== 'UTF-8' && function_exists('mb_convert_encoding')) {
-                        $value = mb_convert_encoding($value, 'UTF-8', $charset);
-                    }
-                }
-                return $value;
+        $values = [];
+        $segments = ['filename' => [], 'name' => []];
+
+        foreach ($parameters as $parameter) {
+            $attribute = strtolower((string)($parameter->attribute ?? ''));
+            $value = (string)($parameter->value ?? '');
+            $values[$attribute] = $value;
+            if (preg_match('/^(filename|name)\*(\d+)(\*)?$/', $attribute, $match)) {
+                $segments[$match[1]][(int)$match[2]] = [
+                    'value' => $value,
+                    'encoded' => ($match[3] ?? '') === '*',
+                ];
             }
         }
+
+        // RFC 2231 continuation parameters (filename*0*, filename*1*, ...)
+        // take precedence over single-part and legacy filename parameters.
+        foreach (['filename', 'name'] as $base) {
+            if (!$segments[$base] || !array_key_exists(0, $segments[$base])) continue;
+            ksort($segments[$base], SORT_NUMERIC);
+            $indexes = array_keys($segments[$base]);
+            if ($indexes !== range(0, count($indexes) - 1)) continue;
+
+            $charset = 'UTF-8';
+            $decoded = '';
+            foreach ($segments[$base] as $index => $segment) {
+                $value = $segment['value'];
+                if ($index === 0 && $segment['encoded']
+                    && preg_match("/^([^']*)'[^']*'(.*)$/s", $value, $match)) {
+                    $charset = $match[1] !== '' ? $match[1] : 'UTF-8';
+                    $value = $match[2];
+                }
+                $decoded .= $segment['encoded'] ? rawurldecode($value) : $value;
+            }
+            return $this->convertFilenameCharset($decoded, $charset);
+        }
+
+        foreach (['filename*', 'name*'] as $wanted) {
+            if (!array_key_exists($wanted, $values)) continue;
+            $value = $values[$wanted];
+            $charset = 'UTF-8';
+            if (preg_match("/^([^']*)'[^']*'(.*)$/s", $value, $match)) {
+                $charset = $match[1] !== '' ? $match[1] : 'UTF-8';
+                $value = $match[2];
+            }
+            return $this->convertFilenameCharset(rawurldecode($value), $charset);
+        }
+
+        foreach (['filename', 'name'] as $wanted) {
+            if (array_key_exists($wanted, $values)) return $values[$wanted];
+        }
         return '';
+    }
+
+    private function convertFilenameCharset(string $value, string $charset): string
+    {
+        if (strtoupper($charset) === 'UTF-8' || !function_exists('mb_convert_encoding')) return $value;
+        try {
+            return mb_convert_encoding($value, 'UTF-8', $charset);
+        } catch (\Throwable) {
+            return $value;
+        }
     }
 
     private function mimeType(int $type, string $subtype): string

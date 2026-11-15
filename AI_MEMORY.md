@@ -23,6 +23,7 @@
 ## Recent hardening
 - IMAP search excludes messages marked Deleted.
 - Inbound attachment transfer decoding accepts all defined IMAP encoding values, including `ENCOTHER` as opaque data, and rejects malformed base64 instead of silently returning an empty attachment.
+- Inbound MIME attachment filenames support RFC 2231 single-value and segmented UTF-8 parameters, with legacy `filename`/`name` fallback.
 - IMAP folder names reject control characters and IMAP mailbox URL delimiters.
 - Missing message overview records are omitted rather than rendered as empty message rows.
 - MIME body and attachment retrieval failures are surfaced instead of silently becoming empty content.
