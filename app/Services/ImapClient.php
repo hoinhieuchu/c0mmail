@@ -160,6 +160,115 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
+    public static function conversationSearchCriteria(string $messageId): string
+    {
+        if (!preg_match('/^<[^<>\\s"\\\\]{1,250}>$/D', $messageId)) {
+            throw new \InvalidArgumentException('Invalid conversation Message-ID.');
+        }
+        return 'UNDELETED OR HEADER Message-ID "' . $messageId
+            . '" OR HEADER References "' . $messageId
+            . '" HEADER In-Reply-To "' . $messageId . '"';
+    }
+
+    public static function extractConversationIds(array $overview): array
+    {
+        $ids = [];
+        foreach (['message_id', 'in_reply_to', 'references'] as $field) {
+            $value = substr((string)($overview[$field] ?? ''), 0, 8192);
+            if (!preg_match_all('/<[^<>\\s"\\\\]{1,250}>/', $value, $matches)) continue;
+            foreach ($matches[0] as $id) {
+                $ids[$id] = true;
+                if (count($ids) >= 40) break 2;
+            }
+        }
+        return array_keys($ids);
+    }
+
+    /**
+     * Resolve a conversation across the entire selected folder, not just the
+     * currently visible page. Searches are bounded to 40 Message-IDs and 100
+     * messages so a malformed or exceptionally large thread cannot exhaust
+     * the request.
+     */
+    public function conversationMessages(array $settings, array $credentials, string $folder, int $uid, int $maxMessages = 100): array
+    {
+        if ($uid < 1) throw new \InvalidArgumentException('Invalid message identifier.');
+        if ($maxMessages < 1 || $maxMessages > 100) throw new \InvalidArgumentException('Invalid conversation message limit.');
+        $this->requireExtension();
+        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
+        try {
+            imap_errors();
+            $seedItems = imap_fetch_overview($stream, (string)$uid, FT_UID);
+            $seedErrors = imap_errors() ?: [];
+            if ($seedItems === false || $seedItems === []) {
+                $detail = $seedErrors !== [] ? ' ' . implode('; ', array_map('strval', $seedErrors)) : '';
+                throw new \RuntimeException('Conversation seed message could not be retrieved.' . $detail);
+            }
+            $seed = $seedItems[0];
+            if ((int)($seed->uid ?? 0) !== $uid) throw new \RuntimeException('Conversation seed message was not found.');
+            $summary = static function (object $item): array {
+                return [
+                    'uid' => (int)($item->uid ?? 0),
+                    'subject' => self::decodeHeader((string)($item->subject ?? '(no subject)')),
+                    'from' => self::decodeHeader((string)($item->from ?? '')),
+                    'to' => self::decodeHeader((string)($item->to ?? '')),
+                    'date' => (string)($item->date ?? ''),
+                    'message_id' => trim((string)($item->message_id ?? '')),
+                    'in_reply_to' => trim((string)($item->in_reply_to ?? '')),
+                    'references' => trim((string)($item->references ?? '')),
+                    'seen' => !empty($item->seen),
+                    'flagged' => !empty($item->flagged),
+                    'size' => (int)($item->size ?? 0),
+                ];
+            };
+            $messages = [$uid => $summary($seed)];
+            $pending = self::extractConversationIds($messages[$uid]);
+            $searched = [];
+
+            while ($pending !== [] && count($searched) < 40 && count($messages) < $maxMessages) {
+                $messageId = array_shift($pending);
+                if (isset($searched[$messageId])) continue;
+                $searched[$messageId] = true;
+
+                imap_errors();
+                $found = imap_search($stream, self::conversationSearchCriteria($messageId), SE_UID, 'UTF-8');
+                $found = self::normalizeSearchResult($found, imap_errors() ?: []);
+                $newUids = [];
+                foreach ($found as $foundUid) {
+                    $foundUid = (int)$foundUid;
+                    if ($foundUid < 1 || isset($messages[$foundUid])) continue;
+                    if (count($messages) + count($newUids) >= $maxMessages) break;
+                    $newUids[$foundUid] = $foundUid;
+                }
+                if ($newUids === []) continue;
+
+                imap_errors();
+                $items = imap_fetch_overview($stream, implode(',', array_values($newUids)), FT_UID);
+                $itemErrors = imap_errors() ?: [];
+                if ($items === false || $items === []) {
+                    $detail = $itemErrors !== [] ? ' ' . implode('; ', array_map('strval', $itemErrors)) : '';
+                    throw new \RuntimeException('Conversation message summaries could not be retrieved.' . $detail);
+                }
+                foreach ($items as $item) {
+                    $itemUid = (int)($item->uid ?? 0);
+                    if (!isset($newUids[$itemUid]) || isset($messages[$itemUid])) continue;
+                    $messages[$itemUid] = $summary($item);
+                    foreach (self::extractConversationIds($messages[$itemUid]) as $relatedId) {
+                        if (!isset($searched[$relatedId]) && !in_array($relatedId, $pending, true) && count($pending) < 40) {
+                            $pending[] = $relatedId;
+                        }
+                    }
+                }
+            }
+
+            $result = array_values($messages);
+            usort($result, static fn(array $a, array $b): int => $b['uid'] <=> $a['uid']);
+            return $result;
+        } finally {
+            imap_close($stream);
+        }
+    }
+
     public function getMessage(array $settings, array $credentials, string $folder, int $uid): array
     {
         $this->requireExtension();
