@@ -12,7 +12,14 @@ $warn=static function(string $label)use(&$warnings):void{$warnings[]=$label;};
 $check(PHP_VERSION_ID>=80200,'PHP 8.2 or newer');
 foreach(['pdo_mysql','imap','openssl','dom','fileinfo','json','session'] as $extension)$check(extension_loaded($extension),'PHP extension: '.$extension);
 $root=dirname(__DIR__);$envPath=$root.'/.env';
-$check(is_file($envPath)&&is_readable($envPath),'.env exists and is readable outside public/');
+if(is_file($envPath)){
+    $check(is_readable($envPath),'.env is readable');
+    $publicRoot=realpath($root.'/public');
+    $envReal=realpath($envPath);
+    $check($publicRoot===false||$envReal===false||!str_starts_with($envReal,$publicRoot.DIRECTORY_SEPARATOR),'.env is outside the public document root');
+}else{
+    $warn('.env is absent; all required configuration must be injected through the process environment.');
+}
 try{$config=Config::load($envPath);}catch(Throwable $e){$config=null;$errors[]='Configuration file can be read';}
 if($config){
     $url=(string)$config->get('APP_URL','');
