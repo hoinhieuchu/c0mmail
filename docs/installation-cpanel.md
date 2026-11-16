@@ -1,22 +1,13 @@
 # cPanel installation
 
-1. Create a MySQL database and database user in cPanel, then grant privileges.
-2. Upload the repository outside `public_html` where possible.
-3. Set the domain/subdomain document root to the repository's `public/` directory. If the hosting plan cannot change document root, copy only the contents of `public/` into `public_html/` and adjust the bootstrap path; keep `app/`, `database/`, `bin/`, `.env`, and `storage/` outside the web root.
-4. Select PHP 8.1+ in MultiPHP Manager. In Select PHP Version / PHP Extensions, enable `imap`, `pdo_mysql`, `openssl`, `fileinfo`, and `mbstring` if available. The application will refuse IMAP operations if the PHP IMAP extension is missing.
-5. Copy `.env.example` to `.env`; set database values, `APP_URL`, `MAIL_DOMAIN`, a unique application key, and the SMTP/IMAP host, port, encryption and timeout values supplied by the email provider.
-6. Generate the key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
-7. Import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_login_rate_limits.sql` using phpMyAdmin, in that order.
-8. Run `php bin/check-requirements.php` from Terminal/SSH and resolve every `[FAIL]`. It checks the PHP runtime, extensions, encryption key, HTTPS and required configuration; it does not test live IMAP/SMTP connectivity.
-9. Create the administrator using `php bin/create-admin.php admin@example.com`; enter the password at the hidden prompt.
-10. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP upload limits (`upload_max_filesize`, `post_max_size`) are at least the application attachment limits.
+1. Create a MySQL database and database user in cPanel, then grant all required privileges.
+2. Upload the repository to a directory outside `public_html` when possible.
+3. Set the domain/subdomain document root to the repository's `public/` directory. If your hosting plan cannot change document root, copy only the contents of `public/` into `public_html/` and adjust the bootstrap path in `public/index.php`; keep `app/`, `database/`, `bin/`, `.env`, and `storage/` outside the web root.
+4. Copy `.env.example` to `.env`; set database values, `APP_URL`, a random key, and mail connection values from CraneMail. If the site is behind a reverse proxy, set `APP_TRUSTED_PROXY_CIDRS` to the proxy's exact IPv4/IPv6 CIDR ranges. Only listed peers may supply client-IP or HTTPS scheme metadata (`CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-Proto`, or `CF-Visitor`); do not trust forwarded headers from unlisted peers.
+5. Generate an application key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
+6. Import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql` and `database/migrations/003_send_attempt_failed_state.sql` and `database/migrations/004_login_rate_limits.sql`, using phpMyAdmin. All four migrations are required for the current webmail release.
+7. Run the administrator bootstrap from Terminal/SSH: `php bin/create-admin.php admin@example.com 'minimum-14-character-password'`. Use `bin/create-member.php` for member accounts.
+8. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP 8.2 or newer has PDO MySQL, OpenSSL, DOM/XML, fileinfo, and the IMAP extension (`imap`) enabled. PHP 8.3 or newer is recommended for a longer supported security lifecycle. On cPanel, select a supported PHP version and enable IMAP, fileinfo, and DOM/XML in Select PHP Version, or ask the hosting provider to enable them for the selected PHP version.
+9. Configure PHP upload limits for MIME attachments: `upload_max_filesize=25M`, `post_max_size=27M`, `max_file_uploads=10`, and a suitable `memory_limit` (at least `192M`), with `display_errors=Off` and `log_errors=On` for production. Use cPanel MultiPHP INI Editor or a `.user.ini` in the public document root where PHP runs as CGI/FastCGI; `.user.ini` changes may take several minutes to take effect. If the host uses PHP-FPM or another handler, follow the provider's PHP INI configuration method.
 
-## Mail protocol values
-
-Use the exact server names and ports given by the mailbox host. Typical secure defaults are IMAP SSL/TLS port 993 and SMTP STARTTLS port 587, but do not assume these are correct for every provider. `MAIL_IMAP_TIMEOUT` and `MAIL_SMTP_TIMEOUT` bound IMAP/SMTP operations (1–120 seconds). `MAIL_IMAP_ENCRYPTION` and `MAIL_SMTP_ENCRYPTION` accept `ssl`, `starttls`, or `none`; TLS peer and hostname verification is enabled.
-
-The app authenticates to IMAP/SMTP using each mailbox's address and password. It does not run a mail server and does not use a guessed CraneMail HTTP API for message access. Start with a mailbox that has real IMAP/SMTP credentials and verify send/receive before enabling users.
-
-## Attachment limits
-
-Defaults are 10 MiB per attachment, 20 MiB total, and five files. Configure PHP upload limits to be slightly higher than `MAIL_ATTACHMENT_TOTAL_MAX_BYTES` to account for multipart overhead. Downloads are forced as files rather than rendered inline.
+Use `MAIL_PROVIDER=manual` until CraneMail confirms its API contract and provides API credentials. Provision mailboxes at CraneMail first, then register them in the admin panel. The first password is displayed once for secure handoff. Open `/mail` after signing in to use the browser webmail. The host must allow outbound SMTP and IMAP connections; configure valid TLS certificates and the exact server hostnames, ports, and encryption modes supplied by CraneMail.

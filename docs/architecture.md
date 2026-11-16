@@ -1,45 +1,50 @@
 # Architecture
 
-## Application layers
+## Layers
 
-- `public/index.php`: front controller, dependency wiring and routes.
-- `app/Core`: configuration, PDO, router, authentication, CSRF and views.
-- `app/Controllers`: request validation, authorization and HTTP responses, including administrator member lifecycle management.
-- `app/Repositories`: parameterized MariaDB/MySQL persistence.
-- `app/Services`: mailbox credential decryption, transport factory, MIME builder, webmail orchestration and privacy-preserving login throttling.
-- `app/Contracts`: identity, IMAP and SMTP interfaces.
-- `app/Providers`: local identity, manual provisioning, a disabled CraneMail boundary, native PHP IMAP and socket SMTP.
+- `public/index.php`: front controller and route registration.
+- `app/Core`: configuration, PDO connection, router, view, CSRF, and authentication primitives.
+- `app/Controllers`: HTTP orchestration.
+- `app/Repositories`: parameterized SQL persistence.
+- `app/Services`: mailbox lifecycle, encrypted credential access, IMAP client, and SMTP transport.
+- `app/Contracts`: replaceable identity and mail-provider contracts.
+- `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
 
-## Authentication abuse controls
+## Authentication and proxy trust
 
-Failed login attempts are stored as HMAC-SHA256 hashes of normalized email and remote IP, keyed by `APP_KEY`; raw identifiers are not persisted. The throttle blocks after 10 failures for an email/IP pair or 30 failures for one email across IPs within a rolling 15-minute window. Optional IP-wide protection blocks after 120 failures in 15 minutes, but is disabled by default because shared reverse proxies can make unrelated users appear to have the same REMOTE_ADDR. Enable `LOGIN_RATE_LIMIT_IP_WIDE=true` only when REMOTE_ADDR is the real client IP. A successful login clears that email's prior failures. Old rows are pruned opportunistically after 30 days. Apply migration `002_login_rate_limits.sql` after the initial schema.
+Login failures are throttled by HMAC keys for normalized account and client IP. `ClientIpResolver` trusts `REMOTE_ADDR` by default; it only accepts `CF-Connecting-IP` or `X-Real-IP` when the immediate peer matches an explicitly configured `APP_TRUSTED_PROXY_CIDRS` entry. `X-Forwarded-For` is not used. Configure only the actual reverse-proxy CIDRs.
 
-## Identity provider boundary
+## Identity adapter
 
-Controllers use `MemberProviderInterface`. The current local session provider is used for development. A future OIDC provider must validate issuer, audience, signature, state, nonce and PKCE, then map the verified subject to a local member. No Account Center endpoint or SSO assumption is embedded.
+Controllers obtain the current principal through `MemberProviderInterface`. The shipped `LocalSessionMemberProvider` reads the authenticated local account from the database. A future OIDC implementation should validate issuer, audience, signature, state, nonce, and PKCE, then map the verified subject to a local member. No Account Center endpoints or SSO assumptions are embedded.
 
-## Mail infrastructure and transport
+## Mail-provider contract
 
-CraneMail is an external mailbox host, not a webmail UI dependency. `ImapClientInterface` and `SmtpClientInterface` isolate the engine from any specific mail host. `NativeImapClient` uses PHP's IMAP extension with TLS certificate verification and configurable open/read/write timeouts. `SocketSmtpClient` implements SMTP greeting/EHLO, optional STARTTLS or implicit TLS, AUTH LOGIN, envelope recipients, DATA, MIME transfer and dot-stuffing.
+`MailProviderInterface` exposes `provision`, `suspend`, `delete`, and `connectionSettings`. The connection settings method returns SMTP/IMAP host, port, and encryption mode without exposing passwords.
 
-The configured mailbox email/password authenticate to both protocols. The password is AES-256-GCM encrypted in the mailboxes table and decrypted only in request memory. It is not stored in a PHP session or written to application logs. During manual provisioning, the initial password is shown only in the immediate no-store admin response, not in a session flash. SMTP AUTH commands and IMAP credentials are not logged.
+Manual mode returns `manual_pending` and makes no external API call. An administrator must create the mailbox at CraneMail, then confirm activation in the admin screen. Manual suspension is recorded only after the operator confirms that they already suspended the mailbox in CraneMail. The app does not claim to have changed the remote mailbox in manual mode.
 
-The IMAP adapter lists real server folders, maps common folder names to Inbox/Sent/Drafts/Spam/Trash roles, paginates by UID, searches message text, fetches MIME content and attachments, updates Seen/Flagged flags, moves/deletes messages, creates custom folders and APPENDs drafts/Sent copies. Folder roles use exact known folder names after normalizing hierarchy separators, plus explicit exact-path overrides; providers with non-English or unusual names may need explicit folder mapping.
+The CraneMail adapter sends JSON over HTTPS with bearer authentication. No verified CraneMail API specification or credentials were supplied during implementation, so the adapter uses configurable endpoint paths and a clearly documented provisional JSON contract:
+- Provision: POST configured `CRANEMAIL_PROVISION_PATH`, JSON request includes `email`, `password`, `display_name`; response must include a non-empty `id`.
+- Suspend: POST configured `CRANEMAIL_SUSPEND_PATH` with `{id}` replaced by the URL-encoded provider ID.
+- Delete: DELETE configured `CRANEMAIL_DELETE_PATH` with the same placeholder replacement.
 
-## Message composition and attachments
+This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are read from environment configuration; they are not inferred from unverified API responses.
 
-`MimeMessageBuilder` produces multipart MIME. To, CC and BCC are used as SMTP envelope recipients; BCC is omitted from sent-message headers. Saved drafts store BCC in a private `X-C0m-Draft-Bcc` header so the field survives reopening; that header is emitted only for drafts and never for sent messages. Drafts can be reopened, edited and sent; existing attachments are downloaded from IMAP and retained when the draft is replaced or sent. Attachment uploads are capped by configuration, limited to five files, and executable/script/web-page extensions are rejected. Downloads are forced to `application/octet-stream` with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
+## Mailbox secrets
 
-HTML message bodies are processed through an allowlist sanitizer and displayed in a sandboxed iframe without scripts, event handlers, remote images or embedded frames. The front controller also emits a restrictive Content Security Policy, frame denial, MIME sniffing protection, a no-referrer policy and a restrictive Permissions Policy. This is intentionally a constrained email preview, not a full fidelity browser renderer.
+Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_KEY`; only ciphertext, nonce, and tag are stored. The initial password is shown once to the administrator after creation for secure handoff. The application does not offer a later password reveal.
 
-## Synchronization model
+## Webmail transport
 
-The current milestone uses on-demand live IMAP reads and UID-based pagination/search; it does not yet implement IMAP IDLE, background polling, push notifications, or a local message cache. Administrators can test an active mailbox's IMAP folder listing and SMTP TLS/AUTH handshake without sending mail. SMTP acceptance is reported separately from the best-effort Sent-folder APPEND: a Sent-copy failure is logged without secrets and shown to the user as a warning; the UI explicitly advises against resending a message already accepted by SMTP. Draft-send cleanup failures are also surfaced so users do not accidentally send duplicates.
+- Webmail performs a lightweight authenticated IMAP polling check every 90 seconds while visible, scoped to the selected folder's UIDVALIDITY and latest UID. The endpoint is session-throttled and never forces a page reload, preserving unsent compose content. This is not a persistent IMAP IDLE connection.
+- `ImapClient` uses PHP's IMAP extension and the configured IMAP host, port, and encryption mode. It discovers server folders, lists messages by UID with server-side TEXT search and UID-cursor pagination scoped to UIDVALIDITY, reads text/plain (or text/html fallback) bodies, marks opened messages as seen, supports explicit read/unread and flagged/star states, appends Sent/Drafts messages, and moves messages by UID.
+- Rich-text compose uses a contenteditable editor with basic formatting controls. Every outbound HTML body is sanitized in `MimeMessageBuilder` using a DOM allow-list: scripts, styles, event handlers, embedded media, and unsafe URL schemes are removed. Only basic semantic formatting and HTTP(S)/mailto links are retained; if DOM/XML is unavailable, HTML degrades safely to escaped text.
+- `SmtpClient` uses authenticated SMTP over implicit TLS or STARTTLS. `MimeMessageBuilder` constructs RFC 5322 multipart messages with UTF-8 plain text, optional HTML alternatives, base64 attachments, and validated In-Reply-To/References headers. The exact generated message is reused for SMTP delivery and the Sent IMAP copy; Drafts use the same builder.
+- Mailbox credentials are decrypted only after the authenticated user is verified as the mailbox owner and the mailbox is active. Credentials are never returned to templates or browser JavaScript.
+- IMAP certificate verification remains enabled. Configure valid certificates on the mail server; do not disable peer verification to work around certificate errors.
+- Folder names are discovered from the IMAP server. Draft and Sent operations are enabled only when matching server folders exist. Trash/Spam moves require those folders to exist.
 
-## CraneMail provisioning boundary
+## Deliberate exclusions
 
-Manual provisioning remains the default. `CraneMailProvider` is a disabled boundary: it makes no HTTP requests and rejects provisioning, suspension and deletion until the official CraneMail API contract and credentials are supplied and the adapter is implemented and tested. Message send/read operations do not call or infer any CraneMail-specific HTTP API; they use the standard protocols above.
-
-## Production exclusions
-
-No MTA/IMAP server is run by this application. OIDC, self-service password reset, billing, domain verification, inline CID images, OAuth2 mail authentication, provider-special-use folder discovery and push/IDLE sync are not part of this milestone.
+The application does not run an MTA/IMAP daemon. Current webmail supports plain-text/HTML composition and inbound/outbound MIME attachments; server-side full-text indexing beyond IMAP TEXT search, rich-text editing, full-folder thread aggregation (current-page RFC conversation grouping is implemented), push/IDLE sync, password-reset email, billing, domain verification, and OIDC remain future work. CraneMail's actual IMAP/SMTP endpoints and authentication policies must be verified in the target environment before production use.
