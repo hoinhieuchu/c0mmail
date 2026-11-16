@@ -183,4 +183,19 @@ test('IMAP attachment reference validator rejects invalid UID, section, and enco
   catch(InvalidArgumentException $e){same('Invalid attachment reference.',$e->getMessage());}
  }
 });
+
+test('IMAP conversation search criteria validate Message-ID before building HEADER search',function(){
+ same('UNDELETED OR HEADER Message-ID "<root@example.test>" OR HEADER References "<root@example.test>" HEADER In-Reply-To "<root@example.test>"',\App\Services\ImapClient::conversationSearchCriteria('<root@example.test>'));
+ foreach(["<bad id@example.test>",'<bad"@example.test>',"<bad@example.test>\r\nBcc:evil@example.test",'<'.str_repeat('x',251).'@example.test>'] as $id){
+  try{\App\Services\ImapClient::conversationSearchCriteria($id);throw new RuntimeException('Expected Message-ID rejection');}
+  catch(InvalidArgumentException $e){same('Invalid conversation Message-ID.',$e->getMessage());}
+ }
+});
+test('IMAP conversation ID extraction deduplicates and bounds RFC header identifiers',function(){
+ same(['<root@example.test>','<reply@example.test>'],\App\Services\ImapClient::extractConversationIds([
+  'message_id'=>'<reply@example.test>',
+  'in_reply_to'=>'<root@example.test>',
+  'references'=>'<root@example.test> <reply@example.test>',
+ ]));
+});
 echo "{$count} tests passed.\n";
