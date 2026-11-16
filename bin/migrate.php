@@ -27,7 +27,7 @@ try{
         if(in_array($version,$applied,true)){fwrite(STDOUT,"SKIP  {$version}\n");continue;}
         $sql=file_get_contents($file);
         if($sql===false||trim($sql)==='') throw new RuntimeException("Migration {$version} is empty or unreadable.");
-        $statements=preg_split('/;\\s*(?:\\r?\\n|$)/',$sql)?:[];
+        $statements=preg_split('/;\s*(?:\r?\n|$)/',$sql)?:[];
         foreach($statements as $statement){
             if(trim($statement)!=='') $db->exec(trim($statement));
         }
