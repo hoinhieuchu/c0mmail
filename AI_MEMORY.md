@@ -68,3 +68,5 @@
 - IMAP message retrieval now rejects empty overview results for UIDs returned by search, validates each overview UID against the requested set, verifies the selected UID before fetching MIME structure, surfaces structure errors, and returns `seen=true` after successfully setting the Seen flag. GreenMail integration verifies the opened-message state.
 
 - IMAP attachment fetch validates a positive UID, a bounded numeric MIME section path (max 20 levels / 64 characters), and a supported transfer encoding before opening the mailbox or fetching bytes. Unit tests cover valid and malformed references.
+
+- Mailbox update polling now uses a recursive timeout instead of a fixed interval, pauses while hidden/offline, resumes on visibility/online events, stops on pagehide, backs off transient failures up to 15 minutes, honors Retry-After delta-seconds and HTTP-date, and replaces the update notice rather than appending duplicate refresh links. Node's built-in test runner covers success/notice replacement, exponential backoff, both Retry-After forms, and hidden-tab behavior.
