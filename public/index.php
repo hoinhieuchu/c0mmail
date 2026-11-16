@@ -7,6 +7,8 @@ use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use A
 require dirname(__DIR__).'/app/bootstrap.php';
 $config=Config::load(dirname(__DIR__).'/.env');
 $isProduction = $config->get('APP_ENV') === 'production';
+$trustedProxyCidrs = array_values(array_filter(array_map('trim', explode(',', (string)$config->get('APP_TRUSTED_PROXY_CIDRS', '')))));
+$isHttps = ClientIpResolver::isSecureRequest($_SERVER, $trustedProxyCidrs);
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
@@ -14,7 +16,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',
-        'secure' => $isProduction || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'secure' => $isProduction || $isHttps,
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -29,7 +31,7 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
 header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'");
 header('Cache-Control: private, no-store, max-age=0');
-if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+if ($isHttps) {
     header('Strict-Transport-Security: max-age=31536000');
 }
 $db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);$sendAttempts=new SendAttemptRepository($db);
