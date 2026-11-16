@@ -22,18 +22,26 @@ The application is a webmail client and mailbox-management layer; it does not ru
 
 PHP 8.2+, PDO MySQL, OpenSSL, DOM/XML, JSON, sessions, fileinfo, and the PHP IMAP extension (`ext-imap`) for browser webmail and attachment uploads. PHP 8.3+ is recommended for a longer supported security lifecycle. MariaDB 10.5+ or MySQL 8+. cURL is optional.
 
-## Quick start
+## Quick start (fresh installation)
 
-1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
-2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`, `database/migrations/003_send_attempt_failed_state.sql`, and `database/migrations/004_login_rate_limits.sql`.
-3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
-4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
-5. Visit `APP_URL` and sign in.
+1. Upload the repository outside `public_html` and set the website document root to the repository's `public/` directory. Enable HTTPS.
+2. Create an empty MariaDB/MySQL database and database user in cPanel.
+3. Copy `.env.example` to `.env`. Set `APP_URL`, a unique 32-byte random `APP_KEY`, database credentials, `MAIL_DOMAIN`, and the exact SMTP/IMAP host, port and TLS mode supplied by your mail provider. Keep `.env` outside the document root.
+4. Run `php bin/check-environment.php` to check PHP extensions and configuration. Missing database tables are expected before the next step.
+5. Run `php bin/migrate.php` to create and record the database schema. The runner applies numbered SQL files in order and skips migrations already recorded in `schema_migrations`.
+6. Run `php bin/check-environment.php` again and resolve every `[FAIL]` item. Warnings for unset SMTP/IMAP hosts mean real webmail is not ready yet.
+7. Create the first administrator with `php bin/create-admin.php admin@example.com`; enter the password at the hidden terminal prompt. Create members with `php bin/create-member.php member@example.com` (also hidden input).
+8. Sign in, create the mailbox at your mail provider, register it in the admin panel, and activate it only after provider-side creation is complete.
+9. Run `php bin/check-mailbox.php MAILBOX_ID`. It authenticates to IMAP, lists folders, authenticates to SMTP over verified TLS and issues NOOP; it does not send a message.
+10. Open `/mail`, send a test message to an address you control, and verify Inbox, Sent, Drafts, attachments and flags.
 
-## Provider modes
+For an existing database imported manually before the migration runner existed, take a backup and verify all four migrations are present before running `php bin/migrate.php --baseline-existing`. The command checks the required tables/columns and the SMTP failed state before recording the baseline. Never run the baseline flag against a partially migrated database.
 
-- `MAIL_PROVIDER=manual`: safe default. Create the mailbox in CraneMail first, then register it in the admin screen. The application marks it `manual_pending`; confirm activation only after the mailbox exists at CraneMail. Manual suspension likewise requires confirmation after suspension in the provider control panel.
-- `MAIL_PROVIDER=cranemail`: enables the HTTP adapter. Configure API base URL, bearer token, and endpoint paths. The adapter contract is described in [architecture](docs/architecture.md). No API credentials are committed. Verify the contract against CraneMail's actual documentation/sandbox before enabling this mode.
+## Mail provider configuration
+
+- `MAIL_PROVIDER=manual` is the supported deployment mode. Create each mailbox in your actual mail provider first, then register the same address and password in the c0m.me admin panel. The mailbox stays `manual_pending` until an administrator confirms that provider-side provisioning is complete.
+- SMTP and IMAP connectivity is configured separately with `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_ENCRYPTION`, `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT`, and `MAIL_IMAP_ENCRYPTION`. Use the exact hostnames and TLS modes from your provider; do not guess these values.
+- `MAIL_PROVIDER=cranemail` is not production-ready: automated provisioning/suspension/deletion deliberately throws until CraneMail supplies a verifiable API specification and credentials. Do not enable it for live users.
 
 ## Tests
 
@@ -43,4 +51,4 @@ Run `php tests/run.php` (64 unit tests) and lint with `find app public bin tests
 
 Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, password-reset email, or conversation grouping across more than the nearest 2,000 folder UIDs (the selected-message conversation panel scans a bounded set of folder summaries). Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
-See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
+Deployment helpers: `bin/check-environment.php` (preflight), `bin/migrate.php` (ordered database migrations), and `bin/check-mailbox.php ID` (live IMAP/SMTP authentication test without sending mail). See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
