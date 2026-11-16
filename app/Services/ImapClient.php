@@ -165,11 +165,7 @@ final class ImapClient
         if (!preg_match('/^<[^<>\\s"\\\\]{1,250}>$/D', $messageId)) {
             throw new \InvalidArgumentException('Invalid conversation Message-ID.');
         }
-        return [
-            'UNDELETED HEADER Message-ID "' . $messageId . '"',
-            'UNDELETED HEADER References "' . $messageId . '"',
-            'UNDELETED HEADER In-Reply-To "' . $messageId . '"',
-        ];
+        return ['UNDELETED TEXT "' . $messageId . '"'];
     }
 
     public static function extractConversationIds(array $overview): array
@@ -256,7 +252,9 @@ final class ImapClient
                 foreach ($items as $item) {
                     $itemUid = (int)($item->uid ?? 0);
                     if (!isset($newUids[$itemUid]) || isset($messages[$itemUid])) continue;
-                    $messages[$itemUid] = $summary($item);
+                    $candidate = $summary($item);
+                    if (!in_array($messageId, self::extractConversationIds($candidate), true)) continue;
+                    $messages[$itemUid] = $candidate;
                     foreach (self::extractConversationIds($messages[$itemUid]) as $relatedId) {
                         if (!isset($searched[$relatedId]) && !in_array($relatedId, $pending, true) && count($pending) < 40) {
                             $pending[] = $relatedId;
