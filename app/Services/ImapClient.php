@@ -209,7 +209,7 @@ final class ImapClient
             $summary = function (object $item): array {
                 return [
                     'uid' => (int)($item->uid ?? 0),
-                    'subject' => $this->decodeHeader((string)($item->subject ?? '(no subject)'),
+                    'subject' => $this->decodeHeader((string)($item->subject ?? '(no subject)')),
                     'from' => $this->decodeHeader((string)($item->from ?? '')),
                     'to' => $this->decodeHeader((string)($item->to ?? '')),
                     'date' => (string)($item->date ?? ''),
