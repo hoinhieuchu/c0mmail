@@ -17,7 +17,7 @@ $db = new PDO(
     [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES=>false]
 );
 
-foreach (['001_initial_schema.sql', '002_mail_send_attempts.sql', '003_send_attempt_failed_state.sql', '004_login_rate_limits.sql'] as $migration) {
+foreach (['001_initial_schema.sql', '002_login_rate_limits.sql', '002_mail_send_attempts.sql', '003_send_attempt_failed_state.sql', '004_login_rate_limits.sql'] as $migration) {
     $sql = file_get_contents(dirname(__DIR__) . '/database/migrations/' . $migration);
     if ($sql === false) throw new RuntimeException('Unable to read migration ' . $migration);
     foreach (explode(';', $sql) as $statement) {
