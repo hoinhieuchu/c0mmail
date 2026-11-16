@@ -1,22 +1,78 @@
-# cPanel installation
+# cPanel installation and first-run checklist
 
-1. Create a MySQL database and database user in cPanel, then grant privileges.
-2. Upload the repository outside `public_html` where possible.
-3. Set the domain/subdomain document root to the repository's `public/` directory. If the hosting plan cannot change document root, copy only the contents of `public/` into `public_html/` and adjust the bootstrap path; keep `app/`, `database/`, `bin/`, `.env`, and `storage/` outside the web root.
-4. Select PHP 8.1+ in MultiPHP Manager. In Select PHP Version / PHP Extensions, enable `imap`, `pdo_mysql`, `openssl`, `fileinfo`, and `mbstring` if available. The application will refuse IMAP operations if the PHP IMAP extension is missing.
-5. Copy `.env.example` to `.env`; set database values, `APP_URL`, `MAIL_DOMAIN`, a unique application key, and the SMTP/IMAP host, port, encryption and timeout values supplied by the email provider.
-6. Generate the key with `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
-7. Import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_login_rate_limits.sql` using phpMyAdmin, in that order.
-8. Run `php bin/check-requirements.php` from Terminal/SSH and resolve every `[FAIL]`. It checks the PHP runtime, extensions, encryption key, HTTPS and required configuration; it does not test live IMAP/SMTP connectivity.
-9. Create the administrator using `php bin/create-admin.php admin@example.com`; enter the password at the hidden prompt.
-10. Ensure `.env` is not web-accessible, HTTPS is enabled, and PHP upload limits (`upload_max_filesize`, `post_max_size`) are at least the application attachment limits.
+## 1. Hosting and document root
 
-## Mail protocol values
+1. Select PHP 8.3 or newer where available (minimum supported: PHP 8.2).
+2. Enable HTTPS before creating the administrator account.
+3. Upload the complete repository to a private directory outside `public_html`, for example `/home/ACCOUNT/c0mmail`.
+4. Set the domain or subdomain document root to `/home/ACCOUNT/c0mmail/public`. This is the preferred layout: `app/`, `bin/`, `database/`, `docs/`, `.env`, and `tests/` must never be web-accessible.
+5. If the hosting plan cannot change the document root, ask the host for a private application directory and a public front-controller mapping. Do not move `.env`, `app/`, `bin/`, or `database/` into a publicly browsable directory.
 
-Use the exact server names and ports given by the mailbox host. Typical secure defaults are IMAP SSL/TLS port 993 and SMTP STARTTLS port 587, but do not assume these are correct for every provider. `MAIL_IMAP_TIMEOUT` and `MAIL_SMTP_TIMEOUT` bound IMAP/SMTP operations (1–120 seconds). `MAIL_IMAP_ENCRYPTION` and `MAIL_SMTP_ENCRYPTION` accept `ssl`, `starttls`, or `none`; TLS peer and hostname verification is enabled.
+## 2. PHP requirements
 
-The app authenticates to IMAP/SMTP using each mailbox's address and password. It does not run a mail server and does not use a guessed CraneMail HTTP API for message access. Start with a mailbox that has real IMAP/SMTP credentials and verify send/receive before enabling users.
+Enable these PHP extensions for the selected domain PHP version:
 
-## Attachment limits
+- `pdo_mysql`
+- `imap`
+- `openssl`
+- `dom` / DOMDocument and XML
+- `fileinfo`
+- `json`
+- `session`
 
-Defaults are 10 MiB per attachment, 20 MiB total, and five files. Configure PHP upload limits to be slightly higher than `MAIL_ATTACHMENT_TOTAL_MAX_BYTES` to account for multipart overhead. Downloads are forced as files rather than rendered inline.
+Recommended limits for attachment handling: `upload_max_filesize=25M`, `post_max_size=27M`, `max_file_uploads=10`, and `memory_limit=192M`. Keep `display_errors=Off`, `log_errors=On`, and `expose_php=Off`. The repository includes `public/.user.ini`; some PHP-FPM/hosting configurations require MultiPHP INI Editor instead. Changes to `.user.ini` can take several minutes to apply.
+
+## 3. Database and application configuration
+
+1. Create an empty MariaDB/MySQL database and a dedicated database user. Grant that user privileges on this database only.
+2. Copy `.env.example` to `.env` in the repository root (outside the document root).
+3. Set `APP_ENV=production`, `APP_DEBUG=false`, the exact HTTPS `APP_URL`, `MAIL_DOMAIN`, and DB credentials.
+4. Generate a unique application key:
+
+   ```sh
+   php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"
+   ```
+
+   Put the complete output in `APP_KEY`. It must decode to exactly 32 bytes. Keep a secure backup of this key: losing it makes stored mailbox passwords undecryptable.
+5. Set SMTP and IMAP hostnames, ports and encryption modes from the mail provider's official setup instructions. Use `ssl` for implicit TLS or `starttls` where the provider explicitly specifies STARTTLS. Do not disable certificate verification to bypass TLS errors.
+6. Keep `MAIL_PROVIDER=manual` unless a separately verified provider adapter is available. CraneMail automated provisioning is currently disabled; create mailboxes in the provider control panel first.
+
+## 4. Install schema and administrator
+
+Run these commands from the application root using the same PHP version selected for the website:
+
+```sh
+php bin/check-environment.php
+php bin/migrate.php
+php bin/check-environment.php
+php bin/create-admin.php admin@example.com
+```
+
+The first preflight can warn that database tables are missing; that is expected for a fresh database. The migration runner applies all five numbered SQL files (including the legacy `002_login_rate_limits.sql`) in filename order and records each completed migration in `schema_migrations`. The second preflight should have no failures. The administrator command prompts for a password without placing it in shell history; use at least 14 characters.
+
+For a database that was imported manually before migration tracking was introduced, take a full backup and verify the schema contains all required tables/columns and the `failed` send-attempt state. Then run `php bin/migrate.php --baseline-existing`. The runner refuses to baseline an incomplete schema. Do not use this flag on a fresh or partially migrated database.
+
+## 5. Provision and test a real mailbox
+
+1. Create the mailbox at the actual mail provider and set its password there.
+2. Sign in as administrator, create the member account if required, then register the mailbox address and the same mailbox password in c0m.me.
+3. Confirm activation only after the mailbox exists and is active at the provider.
+4. Find the mailbox ID in the admin screen/database and run:
+
+   ```sh
+   php bin/check-mailbox.php MAILBOX_ID
+   ```
+
+   This decrypts the saved mailbox credentials, authenticates to IMAP, lists folders, authenticates to SMTP over verified TLS and issues SMTP NOOP. It does not send a message.
+5. Sign in as the mailbox owner, open `/mail`, and send a test email to an address you control. Verify delivery, reply threading, Sent copy, Drafts, read/unread, star, move-to-trash/spam and attachment download.
+
+The hosting provider must allow outbound TCP connections to the configured IMAP and SMTP endpoints. If the check fails, use the exact provider hostname, port and TLS mode and ask the host whether outbound connections are restricted.
+
+## 6. Operations and security
+
+- Keep `.env` outside the document root and restrict filesystem permissions.
+- Back up the database and the `.env` application key together. Database backups without the matching `APP_KEY` cannot restore mailbox credentials.
+- Do not enable `APP_DEBUG` on a public server. Review PHP/web-server logs rather than displaying exception details to users.
+- Restrict administrator accounts and use unique strong passwords.
+- Test restore procedures before accepting real users.
+- This application is a webmail client; it does not provide SMTP/IMAP server infrastructure or operate an MTA.

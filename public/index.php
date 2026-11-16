@@ -1,70 +1,51 @@
 <?php
 declare(strict_types=1);
-use App\Core\Auth;
-use App\Core\Config;
-use App\Core\Database;
-use App\Core\Router;
-use App\Core\View;
-use App\Controllers\AuthController;
-use App\Controllers\DashboardController;
-use App\Controllers\AdminMailboxController;
-use App\Controllers\WebmailController;
-use App\Controllers\AccountController;
-use App\Controllers\AdminMemberController;
-use App\Providers\LocalSessionMemberProvider;
-use App\Providers\ManualMailProvider;
-use App\Providers\CraneMailProvider;
-use App\Repositories\UserRepository;
-use App\Repositories\MailboxRepository;
-use App\Services\MailboxService;
-use App\Services\MailboxCredentialService;
-use App\Services\MailTransportFactory;
-use App\Services\MailboxWebmailService;
-use App\Services\MimeMessageBuilder;
-use App\Services\PasswordPolicy;
-use App\Services\LoginRateLimiter;
+use App\Core\Auth;use App\Core\Config;use App\Core\Database;use App\Core\Router;use App\Core\View;
+use App\Controllers\AuthController;use App\Controllers\DashboardController;use App\Controllers\AdminMailboxController;use App\Controllers\WebmailController;
+use App\Providers\LocalSessionMemberProvider;use App\Providers\ManualMailProvider;use App\Providers\CraneMailProvider;
+use App\Repositories\UserRepository;use App\Repositories\MailboxRepository;use App\Repositories\SendAttemptRepository;use App\Repositories\LoginRateLimitRepository;use App\Services\ClientIpResolver;use App\Services\MailboxService;use App\Services\ImapClient;use App\Services\SmtpClient;
 require dirname(__DIR__).'/app/bootstrap.php';
+$config=Config::load(dirname(__DIR__).'/.env');
+$isProduction = $config->get('APP_ENV') === 'production';
+$trustedProxyCidrs = array_values(array_filter(array_map('trim', explode(',', (string)$config->get('APP_TRUSTED_PROXY_CIDRS', '')))));
+$isHttps = ClientIpResolver::isSecureRequest($_SERVER, $trustedProxyCidrs);
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+    session_name($config->get('APP_SESSION_NAME', 'c0mmail_session'));
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $isProduction || $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    session_start();
+}
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
-header('Referrer-Policy: no-referrer');
+header('Cross-Origin-Opener-Policy: same-origin');
+header('Cross-Origin-Resource-Policy: same-origin');
+header('X-Permitted-Cross-Domain-Policies: none');
+header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:");
-header_remove('X-Powered-By');
-$config=Config::load(dirname(__DIR__).'/.env');
-$debug=strtolower((string)$config->get('APP_DEBUG','false'))==='true';
-if(!$debug)ini_set('display_errors','0');
-set_exception_handler(static function(\Throwable $exception)use($debug):void{error_log('Unhandled application exception: '.get_class($exception));if(!headers_sent()){http_response_code(500);header('Content-Type: text/plain; charset=UTF-8');}echo $debug?htmlspecialchars((string)$exception,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8'):'An unexpected error occurred. Please try again.';});
-$isProduction=strtolower((string)$config->get('APP_ENV','production'))==='production';
-if($isProduction)header('Strict-Transport-Security: max-age=31536000');
-ini_set('session.use_strict_mode','1');ini_set('session.use_only_cookies','1');
-if(session_status()!==PHP_SESSION_ACTIVE){session_name($config->get('APP_SESSION_NAME','c0mmail_session'));session_set_cookie_params(['httponly'=>true,'secure'=>$isProduction,'samesite'=>'Lax']);session_start();}
-$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);
-$auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');$loginRateLimiter=new LoginRateLimiter($db,$config);
+header("Content-Security-Policy: default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; img-src 'self' data:; script-src 'self'; style-src 'self'");
+header('Cache-Control: private, no-store, max-age=0');
+if ($isHttps) {
+    header('Strict-Transport-Security: max-age=31536000');
+}
+$db=Database::connect($config);$users=new UserRepository($db);$mailboxes=new MailboxRepository($db);$sendAttempts=new SendAttemptRepository($db);
+$auth=new Auth(new LocalSessionMemberProvider($users));$view=new View(dirname(__DIR__).'/app/Views');
 $providerName=$config->get('MAIL_PROVIDER','manual');
 if(!in_array($providerName,['manual','cranemail'],true))throw new RuntimeException('Unsupported MAIL_PROVIDER value.');
 $provider=$providerName==='cranemail'?new CraneMailProvider($config):new ManualMailProvider($config);
-$service=new MailboxService($mailboxes,$provider,$config);$authController=new AuthController($users,$view,$loginRateLimiter);$passwordPolicy=new PasswordPolicy();$accountController=new AccountController($auth,$users,$view,$passwordPolicy);$adminMembers=new AdminMemberController($auth,$users,$view,$passwordPolicy);
+$service=new MailboxService($mailboxes,$provider,$config);$loginLimits=new LoginRateLimitRepository($db,$config->required('APP_KEY'));$trustedProxyCidrs=array_values(array_filter(array_map('trim',explode(',',(string)$config->get('APP_TRUSTED_PROXY_CIDRS','')))));$authController=new AuthController($users,$loginLimits,$view,$trustedProxyCidrs);$webmail=new WebmailController($auth,$mailboxes,$service,new ImapClient(),new SmtpClient(),$view,$sendAttempts);
 $dashboard=new DashboardController($auth,$mailboxes,$view,$provider);
-$credentialService=new MailboxCredentialService($mailboxes,$config);$transports=new MailTransportFactory($config);
-$admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'),$credentialService,$transports);
-$mime=new MimeMessageBuilder();
-$webmailService=new MailboxWebmailService($transports,$config,$mime);
-$webmailController=new WebmailController($auth,$view,$credentialService,$webmailService,(int)$config->get('MAIL_ATTACHMENT_MAX_BYTES','10485760'),(int)$config->get('MAIL_ATTACHMENT_TOTAL_MAX_BYTES','20971520'));
+$admin=new AdminMailboxController($auth,$users,$mailboxes,$service,$view,$providerName,$config->required('MAIL_DOMAIN'));
 $router=new Router();
 $router->get('/',fn()=>$auth->check()?$dashboard->index():$authController->showLogin());
 $router->get('/login',fn()=>$authController->showLogin());$router->post('/login',fn()=>$authController->login());$router->post('/logout',fn()=>$authController->logout());
-$router->get('/dashboard',fn()=>$dashboard->index());
-$router->get('/admin/members',fn()=>$adminMembers->index());$router->post('/admin/members',fn()=>$adminMembers->create());$router->post('/admin/members/{id}/status',fn(array $p)=>$adminMembers->updateStatus((int)$p['id']));
-$router->get('/account/password',fn()=>$accountController->showPassword());$router->post('/account/password',fn()=>$accountController->updatePassword());
-$router->get('/mail/{id}',fn(array $p)=>$webmailController->index((int)$p['id']));
-$router->get('/mail/{id}/message/{uid}',fn(array $p)=>$webmailController->showMessage((int)$p['id'],(int)$p['uid']));
-$router->get('/mail/{id}/download/{uid}',fn(array $p)=>$webmailController->download((int)$p['id'],(int)$p['uid']));
-$router->post('/mail/{id}/action',fn(array $p)=>$webmailController->action((int)$p['id']));
-$router->post('/mail/{id}/send',fn(array $p)=>$webmailController->send((int)$p['id']));
-$router->post('/mail/{id}/draft',fn(array $p)=>$webmailController->saveDraft((int)$p['id']));
-$router->post('/mail/{id}/folder',fn(array $p)=>$webmailController->createFolder((int)$p['id']));
-$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());$router->post('/admin/mailboxes/{id}/test',fn(array $p)=>$admin->testConnection((int)$p['id']));
-$router->post('/admin/mailboxes/{id}/credentials',fn(array $p)=>$admin->updateCredentials((int)$p['id']));
+$router->get('/dashboard',fn()=>$dashboard->index());$router->get('/mail',fn()=>$webmail->index());$router->get('/mail/updates',fn()=>$webmail->updates());$router->get('/mail/attachment',fn()=>$webmail->downloadAttachment());$router->post('/mail/send',fn()=>$webmail->send());$router->post('/mail/draft',fn()=>$webmail->saveDraft());$router->post('/mail/move',fn()=>$webmail->move());$router->post('/mail/flag',fn()=>$webmail->flag());$router->get('/admin/mailboxes',fn()=>$admin->index());$router->post('/admin/mailboxes',fn()=>$admin->create());
 $router->post('/admin/mailboxes/{id}/activate',fn(array $p)=>$admin->activateManual((int)$p['id']));
 $router->post('/admin/mailboxes/{id}/suspend',fn(array $p)=>$admin->suspend((int)$p['id']));
 $router->dispatch($_SERVER['REQUEST_METHOD']??'GET',parse_url($_SERVER['REQUEST_URI']??'/',PHP_URL_PATH)?:'/');

@@ -21,7 +21,7 @@ final class MailboxService
                 'ciphertext'=>base64_encode($cipher),'nonce'=>bin2hex($nonce),'tag'=>bin2hex($tag)]);
         } catch (\Throwable $e) {
             if(is_string($result['provider_id']??null)&&$result['provider_id']!=='') {
-                try{$this->provider->delete($result['provider_id']);}catch(\Throwable $cleanup){error_log('Mailbox provider compensation failed: '.$cleanup->getMessage());}
+                try{$this->provider->delete($result['provider_id']);}catch(\Throwable $cleanup){error_log('Mailbox provider compensation failed: '.get_class($cleanup));}
             }
             throw $e;
         }
@@ -39,15 +39,55 @@ final class MailboxService
         elseif($m['provider']!=='manual')throw new \RuntimeException('Provider mailbox ID is missing; refusing to claim remote suspension.');
         $this->repo->setStatus($id,'suspended');
     }
-    public function updateManualPassword(int $id,string $password):void
+    /** Returns credentials only after verifying ownership and active status. */
+    public function credentialsForUser(int $mailboxId, int $userId): array
     {
-        if(strlen($password)<12)throw new \InvalidArgumentException('Mailbox password must be at least 12 characters.');
-        $mailbox=$this->repo->find($id);
-        if(!$mailbox||$mailbox['provider']!=='manual'||$mailbox['status']==='deleted')throw new \RuntimeException('Only existing manual mailboxes can have stored credentials updated here.');
-        $key=$this->encryptionKey();$nonce=random_bytes(12);$tag='';
-        $cipher=openssl_encrypt($password,'aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce,$tag);
-        if($cipher===false)throw new \RuntimeException('Mailbox password encryption failed.');
-        $this->repo->updateCredentials($id,base64_encode($cipher),bin2hex($nonce),bin2hex($tag));
+        $mailbox = $this->repo->findForUser($mailboxId, $userId);
+        if (!$mailbox || $mailbox['status'] !== 'active') throw new \RuntimeException('Active mailbox not found.');
+        if (empty($mailbox['password_ciphertext']) || empty($mailbox['password_nonce']) || empty($mailbox['password_tag'])) {
+            throw new \RuntimeException('Mailbox credentials are unavailable. Re-provision the mailbox password before using webmail.');
+        }
+        $password = openssl_decrypt(
+            base64_decode($mailbox['password_ciphertext'], true) ?: '',
+            'aes-256-gcm',
+            $this->encryptionKey(),
+            OPENSSL_RAW_DATA,
+            hex2bin($mailbox['password_nonce']) ?: '',
+            hex2bin($mailbox['password_tag']) ?: ''
+        );
+        if ($password === false) throw new \RuntimeException('Unable to decrypt mailbox credentials. Check APP_KEY.');
+        return [
+            'mailbox' => ['id' => (int)$mailbox['id'], 'email' => $mailbox['email'], 'display_name' => $mailbox['display_name']],
+            'credentials' => ['email' => $mailbox['email'], 'password' => $password],
+            'settings' => $this->provider->connectionSettings(),
+        ];
+    }
+    /** Protect a one-time secret before placing it in the session flash store. */
+    public function protectTransientSecret(string $secret): array
+    {
+        $nonce = random_bytes(12);
+        $tag = '';
+        $ciphertext = openssl_encrypt($secret, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($ciphertext === false) throw new \RuntimeException('Unable to protect one-time secret.');
+        return [
+            'password_ciphertext' => base64_encode($ciphertext),
+            'password_nonce' => bin2hex($nonce),
+            'password_tag' => bin2hex($tag),
+        ];
+    }
+
+    /** Reveal and authenticate a one-time secret; callers must immediately discard the sealed value. */
+    public function revealTransientSecret(array $sealed): string
+    {
+        $ciphertext = base64_decode((string)($sealed['password_ciphertext'] ?? ''), true);
+        $nonce = hex2bin((string)($sealed['password_nonce'] ?? ''));
+        $tag = hex2bin((string)($sealed['password_tag'] ?? ''));
+        if ($ciphertext === false || $nonce === false || strlen($nonce) !== 12 || $tag === false || strlen($tag) !== 16) {
+            throw new \RuntimeException('One-time secret is unavailable.');
+        }
+        $secret = openssl_decrypt($ciphertext, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($secret === false) throw new \RuntimeException('Unable to decrypt one-time secret.');
+        return $secret;
     }
 
     private function encryptionKey():string

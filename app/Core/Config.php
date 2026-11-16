@@ -11,7 +11,9 @@ final class Config
             $line=trim($line); if ($line==='' || str_starts_with($line,'#') || !str_contains($line,'=')) continue;
             [$key,$value]=explode('=',$line,2); $values[trim($key)]=trim(trim($value), " \t\n\r\0\x0B\"'");
         }
-        return new self(array_merge($values,$_ENV));
+        $environment=getenv();
+        if(!is_array($environment))$environment=[];
+        return new self(array_merge($values,$environment,$_ENV));
     }
     public function get(string $key, ?string $default=null): ?string { return $this->values[$key] ?? $default; }
     public function required(string $key): string

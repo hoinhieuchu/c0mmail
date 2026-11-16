@@ -1,65 +1,547 @@
 <?php
 declare(strict_types=1);
 namespace App\Controllers;
+
 use App\Core\Auth;
 use App\Core\Csrf;
 use App\Core\View;
-use App\Services\MailboxCredentialService;
-use App\Services\MailboxWebmailService;
+use App\Repositories\MailboxRepository;
+use App\Repositories\SendAttemptRepository;
+use App\Services\ImapClient;
+use App\Services\ConversationGrouper;
+use App\Services\MailboxService;
+use App\Services\MimeMessageBuilder;
 use App\Services\HtmlEmailSanitizer;
+use App\Services\SmtpClient;
+use App\Services\SmtpDeliveryException;
+
 final class WebmailController
 {
- public function __construct(private Auth $auth,private View $view,private MailboxCredentialService $credentials,private MailboxWebmailService $webmail,private int $maxAttachmentBytes=10485760,private int $maxTotalBytes=20971520){}
- public function index(int $id):void
- {
-  $user=$this->auth->requireLogin();$creds=$this->credentials->forUser($id,(int)$user['id']);$folders=$this->webmail->folders($creds);
-  $folder=(string)($_GET['folder']??$this->folderByRole($folders,'inbox')??'INBOX');$page=max(1,(int)($_GET['page']??1));$query=trim((string)($_GET['q']??''));$listing=$this->webmail->messages($creds,$folder,$page,$query?:null);
-  $compose=$this->composeDefaults($creds,$folder);
-  if(isset($_GET['edit_draft'])){$draftUid=(int)$_GET['edit_draft'];$draft=$this->webmail->message($creds,$folder,$draftUid);$compose=['to'=>$draft['to'],'cc'=>$draft['cc'],'bcc'=>$draft['bcc']??'','subject'=>$draft['subject'],'body'=>$draft['body'],'draft_uid'=>$draftUid,'attachments'=>$draft['attachments']];}
-  if(isset($_GET['reply'])||isset($_GET['forward'])){$uid=(int)($_GET['reply']??$_GET['forward']);$original=$this->webmail->message($creds,$folder,$uid);if(isset($_GET['reply'])){$compose['to']=$original['from'];$compose['subject']='Re: '.$original['subject'];$compose['body']="\n\nOn ".$original['date'].", ".$original['from']." wrote:\n> ".str_replace("\n","\n> ",$original['body']);}else{$compose['subject']='Fwd: '.$original['subject'];$compose['body']="\n\n---------- Forwarded message ----------\nFrom: ".$original['from']."\nDate: ".$original['date']."\nSubject: ".$original['subject']."\n\n".$original['body'];}}
-  $this->view->render('webmail',['title'=>$creds['email'],'user'=>$user,'mailbox'=>$creds,'folders'=>$folders,'folder'=>$folder,'listing'=>$listing,'message'=>null,'compose'=>$compose,'error'=>null]);
- }
- public function showMessage(int $id,int $uid):void
- {
-  $user=$this->auth->requireLogin();$creds=$this->credentials->forUser($id,(int)$user['id']);$folders=$this->webmail->folders($creds);$folder=(string)($_GET['folder']??'INBOX');$message=$this->webmail->message($creds,$folder,$uid);
-  $message['html']=(new HtmlEmailSanitizer())->sanitize((string)($message['html']??''));
-  $this->view->render('webmail',['title'=>$creds['email'],'user'=>$user,'mailbox'=>$creds,'folders'=>$folders,'folder'=>$folder,'listing'=>['messages'=>[],'total'=>0,'page'=>1,'pages'=>1],'message'=>$message,'compose'=>['to'=>'','cc'=>'','bcc'=>'','subject'=>'','body'=>''],'error'=>null]);
- }
- public function action(int $id):void
- {
-  $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$folder=(string)($_POST['folder']??'INBOX');$uid=(int)($_POST['uid']??0);$action=(string)($_POST['action']??'');
-  if($uid<1)throw new \InvalidArgumentException('Invalid message identifier.');
-  match($action){'read'=>$this->webmail->flag($creds,$folder,$uid,'seen',true),'unread'=>$this->webmail->flag($creds,$folder,$uid,'seen',false),'star'=>$this->webmail->flag($creds,$folder,$uid,'flagged',true),'unstar'=>$this->webmail->flag($creds,$folder,$uid,'flagged',false),'delete'=>$this->webmail->delete($creds,$folder,$uid),'move'=>$this->webmail->move($creds,$folder,$uid,(string)($_POST['destination']??'')),default=>throw new \InvalidArgumentException('Unknown mail action.')};
-  header('Location: /mail/'.$id.'?folder='.rawurlencode($folder));exit;
- }
- public function send(int $id):void
- {
-  $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$attachments=$this->uploads();
-  $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$attachments];
-  if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
-  $draftUid=(int)($_POST['draft_uid']??0);$draftFolder=(string)($_POST['folder']??'Drafts');
-  if(($_POST['mode']??'send')==='draft'){if($draftUid>0)$this->webmail->replaceDraft($creds,$draftFolder,$draftUid,$message);else $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;}
-  if($draftUid>0)$sendResult=$this->webmail->sendDraft($creds,$draftFolder,$draftUid,$message);else $sendResult=['sent_copy_saved'=>$this->webmail->send($creds,$message),'draft_removed'=>true];header('Location: /mail/'.$id.'?sent=1&sent_copy='.($sendResult['sent_copy_saved']?'1':'0').'&draft_removed='.($sendResult['draft_removed']?'1':'0'));exit;
- }
- public function saveDraft(int $id):void
- {
-  $user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);
-  $message=['from'=>$creds['email'],'to'=>(string)($_POST['to']??''),'cc'=>(string)($_POST['cc']??''),'bcc'=>(string)($_POST['bcc']??''),'subject'=>(string)($_POST['subject']??''),'body'=>(string)($_POST['body']??''),'attachments'=>$this->uploads()];
-  if(strlen($message['body'])>1000000||strlen($message['subject'])>998)throw new \InvalidArgumentException('Message content exceeds the allowed size.');
-  $this->webmail->saveDraft($creds,$message);header('Location: /mail/'.$id.'?draft=1');exit;
- }
- public function createFolder(int $id):void{$user=$this->auth->requireLogin();Csrf::verify();$creds=$this->credentials->forUser($id,(int)$user['id']);$name=trim((string)($_POST['name']??''));if(strlen($name)>100)throw new \InvalidArgumentException('Folder name is too long.');$this->webmail->createFolder($creds,$name);header('Location: /mail/'.$id.'?folder='.rawurlencode($name));exit;}
- public function download(int $id,int $uid):void
- {
-  $user=$this->auth->requireLogin();$creds=$this->credentials->forUser($id,(int)$user['id']);$file=$this->webmail->download($creds,(string)($_GET['folder']??'INBOX'),$uid,(string)($_GET['part']??''));
-  header('X-Content-Type-Options: nosniff');header('Content-Type: application/octet-stream');header('Content-Length: '.strlen($file['data']));header("Content-Disposition: attachment; filename*=UTF-8''".rawurlencode(basename($file['name'])));echo $file['data'];exit;
- }
- private function uploads():array
- {
-  $files=$_FILES['attachments']??null;if(!$files||!is_array($files['name']??null))return [];$out=[];$total=0;$max=(int)$this->maxAttachmentBytes;$totalMax=(int)$this->maxTotalBytes;
-  foreach($files['name'] as $i=>$name){if(($files['error'][$i]??UPLOAD_ERR_NO_FILE)===UPLOAD_ERR_NO_FILE)continue;if(($files['error'][$i]??-1)!==UPLOAD_ERR_OK)throw new \RuntimeException('Attachment upload failed.');$size=(int)$files['size'][$i];$total+=$size;if($size<1||$size>$max||$total>$totalMax)throw new \InvalidArgumentException('Attachment size limit exceeded.');$tmp=$files['tmp_name'][$i];if(!is_uploaded_file($tmp))throw new \RuntimeException('Invalid uploaded attachment.');$safe=basename((string)$name);if(preg_match('/\.(php[0-9]?|phtml|phar|cgi|exe|js|html?|svg)$/i',$safe))throw new \InvalidArgumentException('This attachment file type is not allowed.');$out[]=['name'=>$safe,'path'=>$tmp,'type'=>function_exists('mime_content_type')?(mime_content_type($tmp)?:'application/octet-stream'):'application/octet-stream'];if(count($out)>5)throw new \InvalidArgumentException('A maximum of five attachments is allowed.');}
-  return $out;
- }
- private function composeDefaults(array $creds,string $folder):array{return ['to'=>'','cc'=>'','bcc'=>'','subject'=>'','body'=>''];}
- private function folderByRole(array $folders,string $role):?string{foreach($folders as $f)if(($f['role']??'')===$role)return $f['path'];return null;}
+    public function __construct(
+        private Auth $auth,
+        private MailboxRepository $mailboxes,
+        private MailboxService $mailboxService,
+        private ImapClient $imap,
+        private SmtpClient $smtp,
+        private View $view,
+        private SendAttemptRepository $sendAttempts
+    ) {}
+
+    public function index(?string $forcedError = null, array $composeOverride = []): void
+    {
+        $user = $this->auth->requireLogin();
+        $available = array_values(array_filter($this->mailboxes->forUser((int)$user['id']), static fn(array $m): bool => $m['status'] === 'active'));
+        $mailboxId = (int)($_GET['mailbox'] ?? ($available[0]['id'] ?? 0));
+        if ($mailboxId < 1) {
+            $this->render(['user'=>$user,'mailboxes'=>$available,'error'=>$forcedError ?? 'No active mailbox is assigned to your account.','folders'=>[],'compose'=>$composeOverride,'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null]);
+            return;
+        }
+        try {
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = $this->imap->folders($context['settings'], $context['credentials']);
+            $folderNames = array_column($folders, 'name');
+            $folder = (string)($_GET['folder'] ?? 'INBOX');
+            if (!in_array($folder, $folderNames, true)) $folder = in_array('INBOX', $folderNames, true) ? 'INBOX' : ($folderNames[0] ?? 'INBOX');
+            $page = 1;
+            $query = trim((string)($_GET['q'] ?? ''));
+            if (strlen($query) > 200) throw new \InvalidArgumentException('Search query is too long.');
+            $beforeUid = isset($_GET['before']) ? (int)$_GET['before'] : null;
+            $afterUid = isset($_GET['after']) ? (int)$_GET['after'] : null;
+            if ($beforeUid !== null && $beforeUid < 1) $beforeUid = null;
+            if ($afterUid !== null && $afterUid < 1) $afterUid = null;
+            if ($beforeUid !== null && $afterUid !== null) {
+                $beforeUid = null;
+                $afterUid = null;
+            }
+            $uidValidity = $this->imap->uidValidity($context['settings'], $context['credentials'], $folder);
+            $requestedValidity = (int)($_GET['uidvalidity'] ?? 0);
+            if (($beforeUid !== null || $afterUid !== null) && ($requestedValidity < 1 || $requestedValidity !== $uidValidity)) {
+                $beforeUid = null;
+                $afterUid = null;
+            }
+            $messages = $this->imap->listMessages(
+                $context['settings'],
+                $context['credentials'],
+                $folder,
+                51,
+                0,
+                $query !== '' ? $query : null,
+                $beforeUid,
+                $afterUid
+            );
+            $hasMore = count($messages) > 50;
+            $messages = array_slice($messages, 0, 50);
+            $oldestUid = $messages ? min(array_map(static fn(array $message): int => (int)$message['uid'], $messages)) : 0;
+            $latestUid = $messages ? max(array_map(static fn(array $message): int => (int)$message['uid'], $messages)) : 0;
+            $messages = ConversationGrouper::group($messages);
+            $selected = null;
+            $relatedMessages = [];
+            $uid = (int)($_GET['uid'] ?? 0);
+            if ($uid > 0) {
+                $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+                try {
+                    $relatedMessages = $this->imap->conversationMessages(
+                        $context['settings'],
+                        $context['credentials'],
+                        $folder,
+                        $uid
+                    );
+                } catch (\Throwable $conversationError) {
+                    error_log('Webmail conversation lookup failed: ' . get_class($conversationError));
+                    foreach ($messages as $thread) {
+                        if (in_array($uid, $thread['thread_uids'] ?? [], true)) {
+                            $relatedMessages = $thread['thread_items'] ?? [];
+                            break;
+                        }
+                    }
+                }
+            }
+            $compose = array_merge(['to'=>'','cc'=>'','bcc'=>'','reply_to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $composeOverride);
+            $composeMode = (string)($_GET['compose'] ?? '');
+            if ($selected && in_array($composeMode, ['reply', 'forward'], true)) {
+                $subject = (string)$selected['subject'];
+                $compose['subject'] = (stripos($subject, $composeMode === 'reply' ? 'Re:' : 'Fwd:') === 0 ? $subject : ($composeMode === 'reply' ? 'Re: ' : 'Fwd: ') . $subject);
+                if ($composeMode === 'reply') {
+                    $from = (string)$selected['from'];
+                    if (preg_match('/<([^<>]+)>/', $from, $match)) $from = $match[1];
+                    if (filter_var(trim($from), FILTER_VALIDATE_EMAIL)) $compose['to'] = trim($from);
+                    $quoted = preg_split('/\r\n|\r|\n/', (string)$selected['body']) ?: [];
+                    $quoted = implode("\n", array_map(static fn(string $line): string => '> ' . $line, $quoted));
+                    $compose['body'] = "\n\nOn " . $selected['date'] . ', ' . $selected['from'] . " wrote:\n" . $quoted;
+                    $compose['in_reply_to'] = preg_replace('/\s+/', ' ', trim((string)($selected['message_id'] ?? '')));
+                    $references = preg_replace('/\s+/', ' ', trim((string)($selected['references'] ?? '') . ' ' . (string)($selected['message_id'] ?? '')));
+                    $compose['references'] = strlen($references) > 998 ? substr($references, -998) : $references;
+                } else {
+                    $compose['body'] = "---------- Forwarded message ----------\nFrom: " . $selected['from'] . "\nDate: " . $selected['date'] . "\nSubject: " . $selected['subject'] . "\nTo: " . $selected['to'] . "\n\n" . $selected['body'];
+                }
+            }
+            $this->render([
+                'user'=>$user,'mailboxes'=>$available,'activeMailbox'=>$context['mailbox'],
+                'folders'=>$folders,'messages'=>$messages,'selectedFolder'=>$folder,
+                'selectedMessage'=>$selected,'error'=>$forcedError,'page'=>$page,'query'=>$query,'hasMore'=>$hasMore,
+                'cursorBefore'=>$beforeUid,'cursorAfter'=>$afterUid,'uidValidity'=>$uidValidity,'oldestUid'=>$oldestUid,'latestUid'=>$latestUid,'relatedMessages'=>$relatedMessages,'compose'=>$compose,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('Webmail mailbox view failed: ' . get_class($e));
+            $this->render(['user'=>$user,'mailboxes'=>$available,'activeMailbox'=>null,'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'error'=>$this->userFacingError($e),'compose'=>$composeOverride]);
+        }
+    }
+
+    public function send(): void
+    {
+        $user = $this->auth->requireLogin();
+        $ownsSubmission = false;
+        $smtpAccepted = false;
+        $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+        $submissionId = (string)($_POST['submission_id'] ?? '');
+        try {
+            $this->assertPostBodyWithinLimit();
+            Csrf::verify();
+            if (!preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
+                throw new \InvalidArgumentException('This compose form has expired. Reload Webmail before sending.');
+            }
+
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $recipients = $this->parseRecipients((string)($_POST['to'] ?? ''), 'To');
+            $ccRecipients = $this->parseRecipients((string)($_POST['cc'] ?? ''), 'Cc');
+            $bccRecipients = $this->parseRecipients((string)($_POST['bcc'] ?? ''), 'Bcc');
+            $subject = trim((string)($_POST['subject'] ?? ''));
+            $body = (string)($_POST['body'] ?? '');
+            $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $replyTo = trim((string)($_POST['reply_to'] ?? ''));
+            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid Reply-To address.');
+            $replyTo = $replyTo !== '' ? $replyTo : null;
+            $fromName = (string)($context['mailbox']['display_name'] ?? '');
+            $attachments = $this->uploadedAttachments();
+            if ($subject === '' && trim($body) === '' && $htmlBody === null && !$attachments) throw new \InvalidArgumentException('Email subject or body is required.');
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Message exceeds the allowed size.');
+
+            $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
+            // Fingerprint every delivery-relevant field, including attachment bytes.
+            // Reusing a form token with altered content is rejected, not treated as a retry.
+            $payloadHash = hash('sha256', serialize([
+                'from'=>$context['mailbox']['email'],'to'=>$recipients,'cc'=>$ccRecipients,'bcc'=>$bccRecipients,
+                'subject'=>$subject,'body'=>$body,'html_body'=>$htmlBody,'attachments'=>$attachments,'thread'=>$threadHeaders,'from_name'=>$fromName,'reply_to'=>$replyTo,
+            ]));
+            $messageId = '<' . $submissionId . '@c0m.me>';
+            $attempt = $this->sendAttempts->claim($submissionId, (int)$user['id'], $mailboxId, $payloadHash, $messageId);
+            $status = (string)($attempt['status'] ?? 'uncertain');
+            if ($status === 'accepted') {
+                $folder = (string)($attempt['sent_folder'] ?: 'INBOX');
+                $copy = (string)($attempt['sent_copy_status'] ?: 'pending');
+                header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&sent=1&sent_copy=' . rawurlencode($copy) . '&already=1');
+                exit;
+            }
+            if ($status === 'sending' && empty($attempt['claimed'])) {
+                throw new \RuntimeException('A send attempt is already in progress. Wait for it to finish before retrying.');
+            }
+            if ($status !== 'sending') {
+                throw new \RuntimeException('This send attempt has an uncertain delivery status. Check Sent before trying again.');
+            }
+
+            $ownsSubmission = true;
+            // The DB claim is committed before network I/O. A process crash leaves
+            // a durable sending record which becomes uncertain, never retryable.
+            if (session_status() === PHP_SESSION_ACTIVE && !session_write_close()) {
+                throw new \RuntimeException('Unable to release the session before sending.');
+            }
+            $rawMessage = $this->smtp->send(
+                $context['settings'], $context['credentials'], $context['mailbox']['email'],
+                $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders,
+                $messageId, $ccRecipients, $bccRecipients, $fromName, $replyTo
+            );
+            $smtpAccepted = true;
+
+            // Persist SMTP acceptance before the optional IMAP Sent APPEND.
+            $this->sendAttempts->markAccepted($submissionId, (int)$user['id'], $mailboxId);
+            $sentFolder = null;
+            $sentCopy = 'unavailable';
+            try {
+                $sentFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['sent','sent items','sent mail']);
+                if ($sentFolder !== null) {
+                    $this->imap->appendRawMessage($context['settings'], $context['credentials'], $sentFolder, $rawMessage, '\\Seen');
+                    $sentCopy = 'saved';
+                }
+            } catch (\Throwable $saveError) {
+                $sentCopy = 'failed';
+                error_log('Sent-folder copy failed after SMTP accepted message.');
+            }
+            $this->sendAttempts->markSentCopy($submissionId, (int)$user['id'], $mailboxId, $sentFolder, $sentCopy);
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($sentFolder ?? 'INBOX') . '&sent=1&sent_copy=' . $sentCopy);
+            exit;
+        } catch (\Throwable $e) {
+            if ($ownsSubmission && preg_match('/^[a-f0-9]{32}$/', $submissionId)) {
+                try {
+                    $uncertain = $smtpAccepted || ($e instanceof SmtpDeliveryException && $e->deliveryUncertain);
+                    if ($uncertain) {
+                        $this->sendAttempts->markUncertain($submissionId, (int)$user['id'], $mailboxId);
+                    } else {
+                        $this->sendAttempts->markFailed($submissionId, (int)$user['id'], $mailboxId);
+                    }
+                } catch (\Throwable $stateError) {
+                    error_log('Unable to persist mail-send failure state: ' . get_class($stateError));
+                }
+            }
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+            error_log('Webmail send failed: ' . get_class($e));
+            $this->indexWithError($user, $this->userFacingError($e));
+        }
+    }
+
+    public function updates(): void
+    {
+        $user = $this->auth->requireLogin();
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: private, no-store, max-age=0');
+
+        $now = time();
+        $lastCheck = (int)($_SESSION['webmail_sync_last_check'] ?? 0);
+        if ($now - $lastCheck < 30) {
+            http_response_code(429);
+            echo json_encode(['error' => 'Please wait before checking again.']);
+            exit;
+        }
+        $_SESSION['webmail_sync_last_check'] = $now;
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+
+        try {
+            $mailboxId = (int)($_GET['mailbox'] ?? 0);
+            $folder = (string)($_GET['folder'] ?? 'INBOX');
+            $afterUid = (int)($_GET['after'] ?? 0);
+            $query = trim((string)($_GET['q'] ?? ''));
+            if ($mailboxId < 1 || $afterUid < 0 || strlen($query) > 200) {
+                throw new \InvalidArgumentException('Invalid synchronization request.');
+            }
+
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folderNames = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folderNames, true)) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Folder not found.']);
+                exit;
+            }
+
+            $uidValidity = $this->imap->uidValidity($context['settings'], $context['credentials'], $folder);
+            $requestedValidity = (int)($_GET['uidvalidity'] ?? 0);
+            if ($requestedValidity < 1 || $requestedValidity !== $uidValidity) {
+                echo json_encode(['reset_required' => true, 'uid_validity' => $uidValidity]);
+                exit;
+            }
+
+            $updates = $this->imap->listMessages(
+                $context['settings'],
+                $context['credentials'],
+                $folder,
+                21,
+                0,
+                $query !== '' ? $query : null,
+                null,
+                $afterUid > 0 ? $afterUid : null
+            );
+            $newCount = count($updates);
+            $latestUid = $updates
+                ? max(array_map(static fn(array $message): int => (int)$message['uid'], $updates))
+                : $afterUid;
+
+            echo json_encode([
+                'reset_required' => false,
+                'uid_validity' => $uidValidity,
+                'new_count' => min($newCount, 20),
+                'has_more' => $newCount > 20,
+                'latest_uid' => $latestUid,
+            ], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Webmail sync check failed: ' . get_class($e));
+            http_response_code(503);
+            echo json_encode(['error' => 'Unable to check for new messages.']);
+            exit;
+        }
+    }
+
+    public function downloadAttachment(): void
+    {
+        $user = $this->auth->requireLogin();
+        try {
+            $mailboxId = (int)($_GET['mailbox'] ?? 0);
+            $uid = (int)($_GET['uid'] ?? 0);
+            $folder = (string)($_GET['folder'] ?? 'INBOX');
+            $section = (string)($_GET['section'] ?? '');
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
+            $message = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
+            $attachment = null;
+            foreach ($message['attachments'] as $item) if ($item['section'] === $section) { $attachment = $item; break; }
+            if ($attachment === null) { http_response_code(404); exit('Attachment not found.'); }
+            if ((int)$attachment['size'] > 25_000_000) { http_response_code(413); exit('Attachment exceeds the 25 MB download limit.'); }
+            $data = $this->imap->fetchAttachment($context['settings'], $context['credentials'], $folder, $uid, $section, (int)$attachment['encoding']);
+            $filename = basename(str_replace('\\', '/', (string)$attachment['filename']));
+            $filename = preg_replace('/[\x00-\x1F\x7F]/', '_', $filename);
+            if ($filename === '' || $filename === '.' || $filename === '..') $filename = 'attachment.bin';
+            $fallback = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+            $mime = preg_match('#^[a-z0-9.+-]+/[a-z0-9.+-]+$#i', (string)$attachment['mime']) ? $attachment['mime'] : 'application/octet-stream';
+            header('Content-Type: ' . $mime);
+            header('Content-Length: ' . strlen($data));
+            header("Content-Disposition: attachment; filename=\"{$fallback}\"; filename*=UTF-8''" . rawurlencode($filename));
+            header('X-Content-Type-Options: nosniff');
+            header('Cache-Control: private, no-store, max-age=0');
+            echo $data;
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Webmail attachment download failed: ' . get_class($e));
+            http_response_code(404);
+            exit('Attachment not found.');
+        }
+    }
+
+    public function saveDraft(): void
+    {
+        $user = $this->auth->requireLogin();
+        try {
+            $this->assertPostBodyWithinLimit();
+            Csrf::verify();
+            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $recipients = $this->parseRecipients((string)($_POST['to'] ?? ''), 'To');
+            $ccRecipients = $this->parseRecipients((string)($_POST['cc'] ?? ''), 'Cc');
+            $bccRecipients = $this->parseRecipients((string)($_POST['bcc'] ?? ''), 'Bcc');
+            foreach ($recipients as $recipient) if (!filter_var($recipient, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid draft recipient address.');
+            $subject = trim((string)($_POST['subject'] ?? ''));
+            $body = (string)($_POST['body'] ?? '');
+            $htmlBody = trim((string)($_POST['html_body'] ?? '')) !== '' ? (string)$_POST['html_body'] : null;
+            $replyTo = trim((string)($_POST['reply_to'] ?? ''));
+            if ($replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) throw new \InvalidArgumentException('Invalid Reply-To address.');
+            $replyTo = $replyTo !== '' ? $replyTo : null;
+            $fromName = (string)($context['mailbox']['display_name'] ?? '');
+            $attachments = $this->uploadedAttachments();
+            if (strlen($subject) > 998 || strlen($body) > 2_000_000 || ($htmlBody !== null && strlen($htmlBody) > 2_000_000)) throw new \InvalidArgumentException('Draft exceeds the allowed size.');
+            $draftFolder = $this->findFolder($this->imap->folders($context['settings'], $context['credentials']), ['drafts']);
+            if ($draftFolder === null) throw new \RuntimeException('The IMAP server does not expose a Drafts folder.');
+            $threadHeaders = ['in_reply_to'=>(string)($_POST['in_reply_to'] ?? ''),'references'=>(string)($_POST['references'] ?? '')];
+            $rawMessage = MimeMessageBuilder::build($context['mailbox']['email'], $recipients, $subject, $body, $htmlBody, $attachments, $threadHeaders, null, $ccRecipients, $bccRecipients, $fromName, $replyTo);
+            $this->imap->appendRawMessage($context['settings'], $context['credentials'], $draftFolder, $rawMessage, '\\Draft');
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($draftFolder) . '&draft=1');
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Webmail draft save failed: ' . get_class($e));
+            $this->indexWithError($user, $this->userFacingError($e));
+        }
+    }
+
+    private function parseRecipients(string $input, string $field): array
+    {
+        $parts = preg_split('/[,;]+/', $input, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $recipients = array_values(array_unique(array_map('trim', $parts)));
+        foreach ($recipients as $recipient) {
+            if ($recipient === '' || !filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+                throw new \InvalidArgumentException('Invalid ' . $field . ' recipient address.');
+            }
+        }
+        if (count($recipients) > 50) throw new \InvalidArgumentException('A maximum of 50 recipients is allowed.');
+        return $recipients;
+    }
+
+    private function findFolder(array $folders, array $candidates): ?string
+    {
+        foreach ($folders as $folder) {
+            $name = strtolower((string)$folder['name']);
+            $delimiter = (string)($folder['delimiter'] ?? '/');
+            foreach ($candidates as $candidate) {
+                if ($name === $candidate || str_ends_with($name, $delimiter . $candidate) || str_ends_with($name, '.' . $candidate) || str_ends_with($name, '/' . $candidate)) return (string)$folder['name'];
+            }
+        }
+        return null;
+    }
+
+
+    public function flag(): void
+    {
+        $user = $this->auth->requireLogin();
+        Csrf::verify();
+        try {
+            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $uid = (int)($_POST['uid'] ?? 0);
+            $folder = (string)($_POST['folder'] ?? 'INBOX');
+            $flag = (string)($_POST['flag'] ?? '');
+            $enabled = (string)($_POST['enabled'] ?? '1') === '1';
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
+            $this->imap->setFlag($context['settings'], $context['credentials'], $folder, $uid, $flag, $enabled);
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&flagged=1');
+            exit;
+        } catch (\Throwable $e) {
+            $this->indexWithError($user, $this->userFacingError($e));
+        }
+    }
+
+    public function move(): void
+    {
+        $user = $this->auth->requireLogin();
+        Csrf::verify();
+        try {
+            $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
+            $uid = (int)($_POST['uid'] ?? 0);
+            $source = (string)($_POST['source'] ?? 'INBOX');
+            $destination = (string)($_POST['destination'] ?? '');
+            if (!in_array($destination, ['Trash','Deleted Items','Spam','Junk'], true)) throw new \InvalidArgumentException('Unsupported destination folder.');
+            $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
+            $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
+            if (!in_array($source, $folders, true) || !in_array($destination, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
+            $this->imap->move($context['settings'], $context['credentials'], $source, $uid, $destination);
+            header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($source) . '&moved=1');
+            exit;
+        } catch (\Throwable $e) {
+            $this->indexWithError($user, $this->userFacingError($e));
+        }
+    }
+
+    private function indexWithError(array $user, string $error): void
+    {
+        if (isset($_POST['mailbox_id'])) $_GET['mailbox'] = (string)(int)$_POST['mailbox_id'];
+        $_GET['folder'] = (string)($_POST['folder'] ?? $_POST['source'] ?? 'INBOX');
+        if (isset($_POST['q'])) $_GET['q'] = (string)$_POST['q'];
+        unset($_GET['compose']);
+
+        $compose = [
+            'submission_id' => (string)($_POST['submission_id'] ?? ''),
+            'to' => (string)($_POST['to'] ?? ''),
+            'cc' => (string)($_POST['cc'] ?? ''),
+            'bcc' => (string)($_POST['bcc'] ?? ''),
+            'reply_to' => (string)($_POST['reply_to'] ?? ''),
+            'subject' => (string)($_POST['subject'] ?? ''),
+            'body' => (string)($_POST['body'] ?? ''),
+            'html_body' => HtmlEmailSanitizer::sanitize((string)($_POST['html_body'] ?? '')) ?? '',
+            'in_reply_to' => (string)($_POST['in_reply_to'] ?? ''),
+            'references' => (string)($_POST['references'] ?? ''),
+        ];
+        $this->index($error, $compose);
+    }
+
+    private function userFacingError(\Throwable $error): string
+    {
+        if ($error instanceof \InvalidArgumentException) return $error->getMessage();
+        $message = $error->getMessage();
+        if (str_contains($message, 'IMAP extension is required')) return 'Webmail requires the PHP IMAP extension. Ask the hosting provider to enable it.';
+        if (str_contains($message, 'SMTP server rejected')) return 'The SMTP server rejected the message. Check the recipients and mailbox settings.';
+        if (str_contains($message, 'already in progress')) {
+            return 'A send attempt is still in progress. Wait for it to finish before retrying.';
+        }
+        if (str_contains($message, 'SMTP server response timed out') || str_contains($message, 'SMTP server closed')
+            || str_contains($message, 'delivery status is uncertain')) {
+            return 'The SMTP delivery status may be uncertain. Check the Sent folder before attempting another send.';
+        }
+        if (str_contains($message, 'Active mailbox not found')) return 'The selected mailbox is unavailable or inactive.';
+        return 'The mail operation could not be completed. Check the mail server settings and application logs.';
+    }
+
+    private function assertPostBodyWithinLimit(): void
+    {
+        $contentLength = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $limit = $this->iniSizeBytes((string)ini_get('post_max_size'));
+        if ($limit > 0 && $contentLength > $limit && $_POST === [] && $_FILES === []) {
+            throw new \InvalidArgumentException('The upload exceeds the server request limit. Increase PHP post_max_size and try again.');
+        }
+    }
+
+    private function iniSizeBytes(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') return 0;
+        $unit = strtolower(substr($value, -1));
+        $number = (float)$value;
+        return match ($unit) {
+            'g' => (int)($number * 1024 * 1024 * 1024),
+            'm' => (int)($number * 1024 * 1024),
+            'k' => (int)($number * 1024),
+            default => (int)$number,
+        };
+    }
+
+    private function uploadedAttachments(): array
+    {
+        if (!isset($_FILES['attachments']) || !is_array($_FILES['attachments']['name'] ?? null)) return [];
+        $files = $_FILES['attachments'];
+        $count = count($files['name']);
+        if ($count > 10) throw new \InvalidArgumentException('A maximum of 10 attachments is allowed.');
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $attachments = [];
+        $totalBytes = 0;
+        for ($i = 0; $i < $count; $i++) {
+            $error = (int)($files['error'][$i] ?? UPLOAD_ERR_NO_FILE);
+            if ($error === UPLOAD_ERR_NO_FILE) continue;
+            if ($error !== UPLOAD_ERR_OK) {
+                if (in_array($error, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) {
+                    throw new \InvalidArgumentException('An attachment exceeds the PHP upload_max_filesize limit.');
+                }
+                throw new \RuntimeException('An attachment upload failed.');
+            }
+            $tmp = (string)($files['tmp_name'][$i] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) throw new \RuntimeException('Invalid attachment upload.');
+            $size = (int)($files['size'][$i] ?? 0);
+            if ($size < 0 || $size > 25_000_000) throw new \InvalidArgumentException('An attachment exceeds 25 MB.');
+            $data = file_get_contents($tmp);
+            if ($data === false) throw new \RuntimeException('Unable to read uploaded attachment.');
+            $totalBytes += strlen($data);
+            if ($totalBytes > 25_000_000) throw new \InvalidArgumentException('Total attachment size exceeds 25 MB.');
+            $filename = basename(str_replace('\\', '/', (string)($files['name'][$i] ?? 'attachment.bin')));
+            if ($filename === '' || preg_match('/[\x00-\x1F\x7F]/', $filename)) throw new \InvalidArgumentException('Invalid attachment filename.');
+            $mime = $finfo->file($tmp) ?: 'application/octet-stream';
+            $attachments[] = ['filename'=>$filename,'mime'=>$mime,'data'=>$data];
+        }
+        return $attachments;
+    }
+
+    private function render(array $data): void
+    {
+        $data['compose'] = array_merge(['to'=>'','subject'=>'','body'=>'','html_body'=>'','in_reply_to'=>'','references'=>''], $data['compose'] ?? []);
+        $data['compose']['html_body'] = HtmlEmailSanitizer::sanitize((string)$data['compose']['html_body']) ?? '';
+        if (empty($data['compose']['submission_id']) && !empty($data['user']['id']) && !empty($data['activeMailbox']['id'])) {
+            $token = bin2hex(random_bytes(16));
+            $this->sendAttempts->createPending($token, (int)$data['user']['id'], (int)$data['activeMailbox']['id']);
+            $data['compose']['submission_id'] = $token;
+        }
+        $this->view->render('webmail', array_merge(['title'=>'Webmail','error'=>null,'activeMailbox'=>null,'mailboxes'=>[],'folders'=>[],'messages'=>[],'selectedFolder'=>'INBOX','selectedMessage'=>null,'page'=>1,'query'=>'','hasMore'=>false], $data));
+    }
 }
