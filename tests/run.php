@@ -184,18 +184,14 @@ test('IMAP attachment reference validator rejects invalid UID, section, and enco
  }
 });
 
-test('IMAP conversation search criteria validate Message-ID before building HEADER search',function(){
- same(['UNDELETED TEXT "<root@example.test>"'],\App\Services\ImapClient::conversationSearchCriteria('<root@example.test>'));
- foreach(["<bad id@example.test>",'<bad"@example.test>',"<bad@example.test>\r\nBcc:evil@example.test",'<'.str_repeat('x',251).'@example.test>'] as $id){
-  try{\App\Services\ImapClient::conversationSearchCriteria($id);throw new RuntimeException('Expected Message-ID rejection');}
-  catch(InvalidArgumentException $e){same('Invalid conversation Message-ID.',$e->getMessage());}
- }
+test('IMAP conversation lookup rejects invalid message UIDs before connecting',function(){
+ try{(new \App\Services\ImapClient())->conversationMessages([],[],'INBOX',0);throw new RuntimeException('Expected invalid UID rejection');}
+ catch(InvalidArgumentException $e){same('Invalid message identifier.',$e->getMessage());}
 });
-test('IMAP conversation ID extraction deduplicates and bounds RFC header identifiers',function(){
- same(['<reply@example.test>','<root@example.test>'],\App\Services\ImapClient::extractConversationIds([
-  'message_id'=>'<reply@example.test>',
-  'in_reply_to'=>'<root@example.test>',
-  'references'=>'<root@example.test> <reply@example.test>',
- ]));
+test('IMAP conversation lookup enforces bounded result limits',function(){
+ foreach([0,101] as $limit){
+  try{(new \App\Services\ImapClient())->conversationMessages([],[],'INBOX',1,$limit);throw new RuntimeException('Expected conversation limit rejection');}
+  catch(InvalidArgumentException $e){same('Invalid conversation message limit.',$e->getMessage());}
+ }
 });
 echo "{$count} tests passed.\n";
