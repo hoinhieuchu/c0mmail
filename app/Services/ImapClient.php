@@ -160,7 +160,7 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public static function conversationSearchCriteria(string $messageId): string
+    public static function conversationSearchCriteria(string $messageId): array
     {
         if (!preg_match('/^<[^<>\\s"\\\\]{1,250}>$/D', $messageId)) {
             throw new \InvalidArgumentException('Invalid conversation Message-ID.');
