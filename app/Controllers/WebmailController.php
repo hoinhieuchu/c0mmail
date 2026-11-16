@@ -79,10 +79,20 @@ final class WebmailController
             $uid = (int)($_GET['uid'] ?? 0);
             if ($uid > 0) {
                 $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
-                foreach ($messages as $thread) {
-                    if (in_array($uid, $thread['thread_uids'] ?? [], true)) {
-                        $relatedMessages = $thread['thread_items'] ?? [];
-                        break;
+                try {
+                    $relatedMessages = $this->imap->conversationMessages(
+                        $context['settings'],
+                        $context['credentials'],
+                        $folder,
+                        $uid
+                    );
+                } catch (\\Throwable $conversationError) {
+                    error_log('Webmail conversation lookup failed: ' . get_class($conversationError));
+                    foreach ($messages as $thread) {
+                        if (in_array($uid, $thread['thread_uids'] ?? [], true)) {
+                            $relatedMessages = $thread['thread_items'] ?? [];
+                            break;
+                        }
                     }
                 }
             }
