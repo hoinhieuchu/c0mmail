@@ -165,9 +165,11 @@ final class ImapClient
         if (!preg_match('/^<[^<>\\s"\\\\]{1,250}>$/D', $messageId)) {
             throw new \InvalidArgumentException('Invalid conversation Message-ID.');
         }
-        return 'UNDELETED OR HEADER Message-ID "' . $messageId
-            . '" OR HEADER References "' . $messageId
-            . '" HEADER In-Reply-To "' . $messageId . '"';
+        return [
+            'UNDELETED HEADER Message-ID "' . $messageId . '"',
+            'UNDELETED HEADER References "' . $messageId . '"',
+            'UNDELETED HEADER In-Reply-To "' . $messageId . '"',
+        ];
     }
 
     public static function extractConversationIds(array $overview): array
@@ -230,15 +232,17 @@ final class ImapClient
                 if (isset($searched[$messageId])) continue;
                 $searched[$messageId] = true;
 
-                imap_errors();
-                $found = imap_search($stream, self::conversationSearchCriteria($messageId), SE_UID, 'UTF-8');
-                $found = self::normalizeSearchResult($found, imap_errors() ?: []);
                 $newUids = [];
-                foreach ($found as $foundUid) {
-                    $foundUid = (int)$foundUid;
-                    if ($foundUid < 1 || isset($messages[$foundUid])) continue;
-                    if (count($messages) + count($newUids) >= $maxMessages) break;
-                    $newUids[$foundUid] = $foundUid;
+                foreach (self::conversationSearchCriteria($messageId) as $criteria) {
+                    imap_errors();
+                    $found = imap_search($stream, $criteria, SE_UID, 'UTF-8');
+                    $found = self::normalizeSearchResult($found, imap_errors() ?: []);
+                    foreach ($found as $foundUid) {
+                        $foundUid = (int)$foundUid;
+                        if ($foundUid < 1 || isset($messages[$foundUid]) || isset($newUids[$foundUid])) continue;
+                        if (count($messages) + count($newUids) >= $maxMessages) break 2;
+                        $newUids[$foundUid] = $foundUid;
+                    }
                 }
                 if ($newUids === []) continue;
 
