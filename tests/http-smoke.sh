@@ -5,10 +5,10 @@ php -S 127.0.0.1:18080 -t public public/index.php >/tmp/c0mmail-http.log 2>&1 &
 server_pid=$!
 trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ]; then cat /tmp/c0mmail-http.log; fi; exit "$status"' EXIT
 for attempt in {1..30}; do
-  if curl -fsS http://127.0.0.1:18080/login -o /tmp/c0mmail-login.html; then break; fi
+  if curl -fsS http://127.0.0.1:18080/ -o /tmp/c0mmail-login.html; then break; fi
   sleep 1
 done
-curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:18080/login -o /tmp/c0mmail-login.html
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:18080/ -o /tmp/c0mmail-login.html
 grep -q 'Sign in' /tmp/c0mmail-login.html
 csrf=$(grep -oP 'name="_csrf" value="\K[^"]+' /tmp/c0mmail-login.html | head -n1)
 test -n "$csrf"
@@ -70,7 +70,7 @@ curl -fsS -b /tmp/c0mmail-cookies -D /tmp/c0mmail-logout-headers -o /dev/null \
 grep -qi '^Location: /login' /tmp/c0mmail-logout-headers
 curl -sS -b /tmp/c0mmail-cookies -D /tmp/c0mmail-protected-headers -o /dev/null http://127.0.0.1:18080/dashboard
 grep -qi '^Location: /login' /tmp/c0mmail-protected-headers
-curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:18080/login -o /tmp/c0mmail-login-again.html
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:18080/ -o /tmp/c0mmail-login-again.html
 csrf_again=$(grep -oP 'name="_csrf" value="\K[^"]+' /tmp/c0mmail-login-again.html | head -n1)
 curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -D /tmp/c0mmail-old-login-headers -o /tmp/c0mmail-old-login-result \
   -X POST http://127.0.0.1:18080/login --data-urlencode "_csrf=$csrf_again" \
