@@ -1,29 +1,45 @@
 <?php
 declare(strict_types=1);
-namespace App\Services;
+namespace App\\Services;
 
-/** Resolves a client address without trusting spoofable forwarding headers. */
+/** Resolves client addresses and proxy-supplied transport metadata safely. */
 final class ClientIpResolver
 {
     public static function resolve(array $server, array $trustedProxyCidrs = []): string
     {
         $remote = filter_var($server['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP);
         if ($remote === false) return 'unknown';
-
-        $trusted = false;
-        foreach ($trustedProxyCidrs as $cidr) {
-            if (self::matchesCidr($remote, (string)$cidr)) {
-                $trusted = true;
-                break;
-            }
-        }
-        if (!$trusted) return $remote;
+        if (!self::isTrustedProxy($remote, $trustedProxyCidrs)) return $remote;
 
         foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP'] as $header) {
             $candidate = filter_var(trim((string)($server[$header] ?? '')), FILTER_VALIDATE_IP);
             if ($candidate !== false) return $candidate;
         }
         return $remote;
+    }
+
+    public static function isSecureRequest(array $server, array $trustedProxyCidrs = []): bool
+    {
+        $https = strtolower(trim((string)($server['HTTPS'] ?? '')));
+        if ($https !== '' && $https !== 'off' && $https !== '0') return true;
+
+        $remote = filter_var($server['REMOTE_ADDR'] ?? '', FILTER_VALIDATE_IP);
+        if ($remote === false || !self::isTrustedProxy($remote, $trustedProxyCidrs)) return false;
+
+        $forwardedProto = strtolower(trim(explode(',', (string)($server['HTTP_X_FORWARDED_PROTO'] ?? ''))[0]));
+        if ($forwardedProto === 'https') return true;
+
+        $cloudflareVisitor = json_decode((string)($server['HTTP_CF_VISITOR'] ?? ''), true);
+        return is_array($cloudflareVisitor)
+            && strtolower((string)($cloudflareVisitor['scheme'] ?? '')) === 'https';
+    }
+
+    private static function isTrustedProxy(string $remote, array $trustedProxyCidrs): bool
+    {
+        foreach ($trustedProxyCidrs as $cidr) {
+            if (self::matchesCidr($remote, (string)$cidr)) return true;
+        }
+        return false;
     }
 
     private static function matchesCidr(string $ip, string $cidr): bool
