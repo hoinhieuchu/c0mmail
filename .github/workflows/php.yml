@@ -121,7 +121,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: "8.5"
-          extensions: pdo_mysql
+          extensions: pdo_mysql, imap, fileinfo, dom
       - name: Test clean-install migration runner
         env:
           DB_HOST: 127.0.0.1
@@ -133,6 +133,24 @@ jobs:
           php bin/migrate.php
           php bin/migrate.php
           test "$(mysql -N -h 127.0.0.1 -uroot -proot c0mmail_install_test -e 'SELECT COUNT(*) FROM schema_migrations')" = "5"
+      - name: Test production configuration preflight
+        env:
+          APP_ENV: production
+          APP_DEBUG: "false"
+          APP_URL: https://mail.example.com
+          APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+          MAIL_DOMAIN: example.com
+          MAIL_SMTP_HOST: smtp.example.com
+          MAIL_SMTP_PORT: "587"
+          MAIL_SMTP_ENCRYPTION: starttls
+          MAIL_IMAP_HOST: imap.example.com
+          MAIL_IMAP_PORT: "993"
+          MAIL_IMAP_ENCRYPTION: ssl
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: c0mmail_install_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: php bin/check-environment.php
       - name: Test durable send attempts against MariaDB
         env:
           DB_HOST: 127.0.0.1
