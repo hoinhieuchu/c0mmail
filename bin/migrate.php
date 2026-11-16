@@ -26,6 +26,7 @@ try{
                 'mailboxes'=>['id','user_id','email','display_name','provider','provider_mailbox_id','status','password_ciphertext','password_nonce','password_tag'],
                 'mail_send_attempts'=>['submission_id','user_id','mailbox_id','payload_hash','status','message_id','sent_folder','sent_copy_status'],
                 'login_rate_limits'=>['key_hash','attempts','window_started_at','blocked_until','updated_at'],
+                'login_attempts'=>['id','email_hash','ip_hash','attempted_at'],
             ];
             foreach($required as $table=>$columns){
                 $found=$db->query("SHOW COLUMNS FROM `".$table."`")->fetchAll(PDO::FETCH_COLUMN);
@@ -35,7 +36,7 @@ try{
             if(!$status||!str_contains(strtolower((string)$status['Type']),"'failed'"))throw new RuntimeException('Cannot baseline: mail_send_attempts.status must include the failed state from migration 003.');
             foreach($files as $file){
                 $version=basename($file);
-                if(in_array($version,['001_initial_schema.sql','002_mail_send_attempts.sql','003_send_attempt_failed_state.sql','004_login_rate_limits.sql'],true)){
+                if(in_array($version,['001_initial_schema.sql','002_login_rate_limits.sql','002_mail_send_attempts.sql','003_send_attempt_failed_state.sql','004_login_rate_limits.sql'],true)){
                     $s=$db->prepare('INSERT INTO schema_migrations(version) VALUES(?)');$s->execute([$version]);
                 }
             }
