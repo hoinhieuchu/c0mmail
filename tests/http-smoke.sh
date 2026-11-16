@@ -19,7 +19,7 @@ curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -D /tmp/c0mmail-login-
   --data-urlencode 'password=ci-password-123456789'
 grep -qi '^Location: /dashboard' /tmp/c0mmail-login-headers
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/account/password -o /tmp/c0mmail-password.html
-csrf=$(grep -oP 'name="_csrf" value="\\K[^"]+' /tmp/c0mmail-password.html | head -n1)
+csrf=$(grep -oP 'name="_csrf" value="\K[^"]+' /tmp/c0mmail-password.html | head -n1)
 test -n "$csrf"
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/dashboard -o /tmp/c0mmail-dashboard.html
 grep -q 'Your mailboxes' /tmp/c0mmail-dashboard.html
