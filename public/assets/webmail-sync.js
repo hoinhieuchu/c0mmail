@@ -21,9 +21,14 @@
 
     const retryDelay = (response) => {
         if (response && response.status === 429) {
-            const retryAfter = Number.parseInt(response.headers.get('Retry-After') || '', 10);
+            const retryValue = response.headers.get('Retry-After') || '';
+            const retryAfter = Number.parseInt(retryValue, 10);
             if (Number.isFinite(retryAfter) && retryAfter > 0) {
                 return Math.min(MAX_BACKOFF, retryAfter * 1000);
+            }
+            const retryAt = Date.parse(retryValue);
+            if (Number.isFinite(retryAt)) {
+                return Math.min(MAX_BACKOFF, Math.max(1000, retryAt - Date.now()));
             }
         }
         failures = Math.min(failures + 1, 8);
@@ -61,8 +66,8 @@
             let message = '';
             if (result.reset_required) {
                 message = 'This folder changed on the mail server. Refresh to load the current folder state.';
-            } else if (Number(result.new_count) > 0) {
-                const count = Math.max(0, Number(result.new_count) || 0);
+            } else if (Number.isFinite(Number(result.new_count)) && Number(result.new_count) > 0) {
+                const count = Math.max(0, Number(result.new_count));
                 message = result.has_more
                     ? 'More than 20 new messages are available.'
                     : count + (count === 1 ? ' new message is' : ' new messages are') + ' available.';
