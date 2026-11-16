@@ -8,7 +8,7 @@
 - `app/Repositories`: parameterized SQL persistence.
 - `app/Services`: mailbox lifecycle, encrypted credential access, IMAP client, and SMTP transport.
 - `app/Contracts`: replaceable identity and mail-provider contracts.
-- `app/Providers`: local session identity, manual provider, and CraneMail HTTP adapter.
+- `app/Providers`: local session identity, manual provider, and fail-closed CraneMail adapter.
 
 ## Authentication and proxy trust
 
@@ -24,12 +24,7 @@ Controllers obtain the current principal through `MemberProviderInterface`. The 
 
 Manual mode returns `manual_pending` and makes no external API call. An administrator must create the mailbox at CraneMail, then confirm activation in the admin screen. Manual suspension is recorded only after the operator confirms that they already suspended the mailbox in CraneMail. The app does not claim to have changed the remote mailbox in manual mode.
 
-The CraneMail adapter sends JSON over HTTPS with bearer authentication. No verified CraneMail API specification or credentials were supplied during implementation, so the adapter uses configurable endpoint paths and a clearly documented provisional JSON contract:
-- Provision: POST configured `CRANEMAIL_PROVISION_PATH`, JSON request includes `email`, `password`, `display_name`; response must include a non-empty `id`.
-- Suspend: POST configured `CRANEMAIL_SUSPEND_PATH` with `{id}` replaced by the URL-encoded provider ID.
-- Delete: DELETE configured `CRANEMAIL_DELETE_PATH` with the same placeholder replacement.
-
-This contract is an integration boundary, not a claim that CraneMail's production API uses these routes or field names. Validate against CraneMail documentation/sandbox before switching from manual mode. SMTP/IMAP connection settings are read from environment configuration; they are not inferred from unverified API responses.
+The shipped `CraneMailProvider` is deliberately fail-closed for provisioning, suspension and deletion. CraneMail's official API contract and credentials have not yet been verified, so the application must not invent endpoint paths or claim that remote mailbox lifecycle actions succeeded. Use `MAIL_PROVIDER=manual`: provision the mailbox in the real provider control panel, register its credentials in c0m.me, and confirm activation only after provider-side creation. SMTP/IMAP connection settings are read from the explicit environment variables; they are never inferred from an unverified API response.
 
 ## Mailbox secrets
 
@@ -44,6 +39,12 @@ Mailbox passwords are encrypted with AES-256-GCM using the decoded 32-byte `APP_
 - Mailbox credentials are decrypted only after the authenticated user is verified as the mailbox owner and the mailbox is active. Credentials are never returned to templates or browser JavaScript.
 - IMAP certificate verification remains enabled. Configure valid certificates on the mail server; do not disable peer verification to work around certificate errors.
 - Folder names are discovered from the IMAP server. Draft and Sent operations are enabled only when matching server folders exist. Trash/Spam moves require those folders to exist.
+
+## Deployment and diagnostics
+
+- `bin/check-environment.php` validates PHP extensions, production URL/key configuration, database connectivity and required schema tables.
+- `bin/migrate.php` applies ordered SQL migrations and records them in `schema_migrations`; `--baseline-existing` is only for an already migrated database after a backup and schema verification.
+- `bin/check-mailbox.php ID` authenticates the stored mailbox to IMAP, lists folders, then authenticates to SMTP over verified TLS and issues NOOP without sending a message.
 
 ## Deliberate exclusions
 
