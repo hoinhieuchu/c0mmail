@@ -206,12 +206,12 @@ final class ImapClient
             }
             $seed = $seedItems[0];
             if ((int)($seed->uid ?? 0) !== $uid) throw new \RuntimeException('Conversation seed message was not found.');
-            $summary = static function (object $item): array {
+            $summary = function (object $item): array {
                 return [
                     'uid' => (int)($item->uid ?? 0),
-                    'subject' => self::decodeHeader((string)($item->subject ?? '(no subject)')),
-                    'from' => self::decodeHeader((string)($item->from ?? '')),
-                    'to' => self::decodeHeader((string)($item->to ?? '')),
+                    'subject' => $this->decodeHeader((string)($item->subject ?? '(no subject)'),
+                    'from' => $this->decodeHeader((string)($item->from ?? '')),
+                    'to' => $this->decodeHeader((string)($item->to ?? '')),
                     'date' => (string)($item->date ?? ''),
                     'message_id' => trim((string)($item->message_id ?? '')),
                     'in_reply_to' => trim((string)($item->in_reply_to ?? '')),
