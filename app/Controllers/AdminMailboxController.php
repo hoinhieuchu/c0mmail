@@ -16,7 +16,7 @@ final class AdminMailboxController
         if (is_array($created) && isset($created['password_ciphertext'])) {
             try {
                 $created['password'] = $this->service->revealTransientSecret($created);
-            } catch (\\Throwable $error) {
+            } catch (\Throwable $error) {
                 error_log('One-time mailbox password flash could not be decrypted.');
                 $created = null;
             }
