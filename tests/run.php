@@ -173,6 +173,22 @@ test('client IP resolver supports trusted IPv6 proxies and rejects invalid CIDRs
  same('2001:db8::10',\App\Services\ClientIpResolver::resolve(['REMOTE_ADDR'=>'2001:db8::10','HTTP_X_REAL_IP'=>'2001:db8::20'],['not-a-cidr']));
 });
 
+test('secure request resolver accepts direct HTTPS connections',function(){
+ same(true,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'on','REMOTE_ADDR'=>'203.0.113.10'],[]));
+ same(true,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'1','REMOTE_ADDR'=>'203.0.113.10'],[]));
+});
+test('secure request resolver ignores spoofed forwarded protocol from untrusted peers',function(){
+ same(false,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_X_FORWARDED_PROTO'=>'https'],[]));
+ same(false,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_VISITOR'=>'{"scheme":"https"}'],['192.0.2.0/24']));
+});
+test('secure request resolver trusts forwarded HTTPS only from configured proxy CIDRs',function(){
+ same(true,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_X_FORWARDED_PROTO'=>'https,http'],['203.0.113.0/24']));
+ same(false,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_X_FORWARDED_PROTO'=>'http'],['203.0.113.0/24']));
+});
+test('secure request resolver trusts Cloudflare visitor scheme only from trusted proxy',function(){
+ same(true,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_VISITOR'=>'{"scheme":"https"}'],['203.0.113.0/24']));
+ same(false,\App\Services\ClientIpResolver::isSecureRequest(['HTTPS'=>'off','REMOTE_ADDR'=>'203.0.113.10','HTTP_CF_VISITOR'=>'{"scheme":"https"}'],[]));
+});
 test('IMAP attachment reference validator accepts bounded references',function(){
  same(null,\App\Services\ImapClient::validateAttachmentReference(12,'1.2.3',3));
  same(null,\App\Services\ImapClient::validateAttachmentReference(1,'2',0));
