@@ -170,4 +170,4 @@ jobs:
           printf 'APP_KEY=base64:%s\n' "$(php -r 'echo base64_encode(random_bytes(32));')" >> .env
           php bin/migrate.php
           php bin/create-member.php ci-member@example.test ci-member-password-123456
-          bash -x tests/http-smoke.sh
+          bash tests/http-smoke.sh
