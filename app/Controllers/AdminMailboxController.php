@@ -7,29 +7,30 @@ use App\Core\View;
 use App\Repositories\UserRepository;
 use App\Repositories\MailboxRepository;
 use App\Services\MailboxService;
-use App\Services\MailboxCredentialService;
-use App\Services\MailTransportFactory;
 final class AdminMailboxController
 {
-    public function __construct(private Auth $auth,private UserRepository $users,private MailboxRepository $mailboxes,private MailboxService $service,private View $view,private string $providerName,private string $mailDomain,private MailboxCredentialService $credentials,private MailTransportFactory $transports){}
+    public function __construct(private Auth $auth,private UserRepository $users,private MailboxRepository $mailboxes,private MailboxService $service,private View $view,private string $providerName,private string $mailDomain){}
     public function index():void
     {
-        $admin=$this->auth->requireAdmin();
-        $notice=$_SESSION['mailbox_notice']??null;unset($_SESSION['mailbox_notice']);$this->view->render('admin/mailboxes',['title'=>'Mailbox administration','user'=>$admin,'members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'notice'=>$notice,'created'=>null,'providerName'=>$this->providerName]);
+        $this->auth->requireAdmin();$created=$_SESSION['created_mailbox']??null;unset($_SESSION['created_mailbox']);
+        $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'created'=>$created,'providerName'=>$this->providerName]);
     }
     public function create():void
     {
-        $admin=$this->auth->requireAdmin();Csrf::verify();
+        $this->auth->requireAdmin();Csrf::verify();
         try {
             $local=trim((string)($_POST['local_part']??''));$name=trim((string)($_POST['display_name']??''));$password=(string)($_POST['password']??'');
             if(!preg_match('/^[a-zA-Z0-9._+-]{1,64}$/',$local))throw new \InvalidArgumentException('Local part contains unsupported characters.');
             if(strlen($password)<12)throw new \InvalidArgumentException('Mailbox password must be at least 12 characters.');
             $id=$this->service->create(['user_id'=>(int)($_POST['user_id']??0),'local_part'=>$local,'display_name'=>$name,'password'=>$password]);
-            header('Cache-Control: no-store, private');
-            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','user'=>$admin,'members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'notice'=>null,'created'=>['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password],'providerName'=>$this->providerName]);
-            return;
+            $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password];
+            header('Location: /admin/mailboxes');exit;
         } catch (\Throwable $e) {
-            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','user'=>$admin,'members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$e->getMessage(),'notice'=>null,'created'=>null,'providerName'=>$this->providerName]);
+            error_log('Mailbox registration failed: ' . get_class($e));
+            $message = $e instanceof \InvalidArgumentException
+                ? $e->getMessage()
+                : 'Mailbox registration could not be completed. Check provider settings and application logs.';
+            $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>$message,'created'=>null,'providerName'=>$this->providerName]);
         }
     }
     public function activateManual(int $id):void
@@ -44,37 +45,4 @@ final class AdminMailboxController
         if($this->providerName==='manual'&&($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Confirm external suspension first.');}
         $this->service->suspend($id);header('Location: /admin/mailboxes');exit;
     }
-    public function testConnection(int $id):void
-    {
-        $this->auth->requireAdmin();Csrf::verify();$stage='credential decryption';
-        try{
-            $credentials=$this->credentials->forAdmin($id);
-            $stage='IMAP';
-            $imap=$this->transports->imap($credentials);
-            try{
-                $folders=$imap->folders();
-                if(!array_filter($folders,static fn(array $folder):bool=>$folder['role']==='inbox'))throw new \RuntimeException('IMAP INBOX folder was not found.');
-            }finally{$imap->close();}
-            $stage='SMTP';
-            $this->transports->smtp($credentials)->verify();
-            $_SESSION['mailbox_notice']='Connection test passed: IMAP folder discovery and SMTP TLS/AUTH succeeded without sending a message.';
-        }catch(\Throwable $e){
-            error_log('Mailbox '.$stage.' connection test failed: '.get_class($e));
-            $_SESSION['mailbox_notice']=$stage.' connection test failed. Check the provider host, port, TLS mode, mailbox credentials and server logs.';
-        }
-        header('Location: /admin/mailboxes');exit;
-    }
-
-    public function updateCredentials(int $id):void
-    {
-        $this->auth->requireAdmin();Csrf::verify();
-        if($this->providerName!=='manual'||($_POST['confirm_external']??'')!=='yes'){http_response_code(422);exit('Change the mailbox password at the provider first, then confirm the update here.');}
-        try{
-            $password=(string)($_POST['password']??'');
-            $this->service->updateManualPassword($id,$password);
-            $_SESSION['mailbox_notice']='Encrypted mailbox credentials updated. Verify IMAP and SMTP access with this mailbox.';
-        }catch(\Throwable $e){$_SESSION['mailbox_notice']='Credential update failed: '.$e->getMessage();}
-        header('Location: /admin/mailboxes');exit;
-    }
-
 }

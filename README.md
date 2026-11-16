@@ -1,54 +1,46 @@
 # c0m.me Mail
 
-Lightweight PHP MVC webmail for cPanel/shared hosting. MariaDB/MySQL via PDO; vanilla JavaScript/CSS. CraneMail or another mail provider supplies the actual mailbox infrastructure. This application is an IMAP/SMTP client and does not run an MTA.
+Lightweight PHP MVC mail-account management application for cPanel/shared hosting. MariaDB/MySQL via PDO; vanilla JavaScript and CSS.
 
-## Milestone 1 foundation
+## Implemented foundation
 
-Local authentication with HMAC-based failed-login throttling, admin/member roles, admin UI for creating/suspending/reactivating member accounts, account password changes with current-password verification, a replaceable identity provider interface for future OIDC, mailbox administration, AES-256-GCM encrypted mailbox credentials, manual provisioning, and a configurable (provisional) CraneMail provisioning adapter.
+- Local account authentication, role-based admin access, CSRF protection, and session ID rotation. Login attempts are throttled persistently by account and client IP; forwarded IP headers are accepted only from explicitly configured trusted proxy CIDRs.
+- Member-provider abstraction so a future c0m.me Account Center OIDC adapter can replace local identity without rewriting controllers.
+- Mail-provider abstraction with manual provisioning and a configurable CraneMail HTTP adapter.
+- Mailbox ownership, encrypted-at-rest mailbox passwords, one-time display of the initial password after registration, and manual activation/suspension confirmation.
+- Conversation grouping uses RFC Message-ID/References/In-Reply-To relationships for the current 50-message page; opening a thread exposes its related messages from that page. It does not merge by subject alone.
+- Webmail checks the selected IMAP folder for new messages every 90 seconds while the page is visible; the check is session-throttled and offers a manual refresh without interrupting an in-progress composition. This is polling, not IMAP IDLE push.
+- Browser webmail using the configured IMAP server: folder discovery, Inbox/message listing, message reading, read/unread and star flags, server-side text search, 50-message pagination, downloading attachments, and moving messages to Trash/Spam folders when available.
+- SMTP sending with authenticated SSL/STARTTLS transport, To/Cc/Bcc delivery (Bcc is never exposed in message headers), mailbox display-name encoding, optional validated Reply-To, plain-text and HTML alternatives, and multiple MIME attachments; sent messages are copied to the server's Sent folder when that folder is exposed. Durable database-backed send-attempt records prevent duplicate submissions across sessions and PHP workers; uncertain outcomes after DATA are blocked rather than automatically retried; failures known to occur before DATA are recorded as failed and may be safely retried with the same token. Explicit SMTP 4xx/5xx rejection replies after DATA are also definitive; a missing final reply remains uncertain.
+- Draft saving to the server's Drafts folder when available.
+- Rich-text compose with bold, italic, underline, lists, and links; outbound HTML is sanitized server-side, with unsafe tags, attributes, embedded media, and URL schemes removed.
+- SQL migration, CLI account bootstrap, automated tests, and GitHub Actions PHP lint/test workflow.
 
-## Milestone 2 webmail engine
-
-- Native PHP IMAP adapter: folder discovery, message listing, UID-based pagination, text search, MIME body/attachment parsing, read/unread and star flags, move, delete/expunge, custom folder creation, APPEND for drafts and Sent copies.
-- Socket SMTP adapter: SMTP AUTH LOGIN, implicit TLS or STARTTLS, message delivery, To/CC/BCC, folded UTF-8 MIME headers, MIME attachments and dot-stuffing. IMAP operations have configurable open/read/write timeouts.
-- Provider-neutral IMAP/SMTP interfaces; mailbox passwords are decrypted only for a request and are never stored in the PHP session or logged. The initial manual mailbox password is displayed only in a no-store response after creation. SMTP acceptance and Sent-folder persistence are reported separately, and draft-send cleanup failures warn users not to resend duplicates.
-- Browser UI for folders, message reading, sandboxed HTML email preview with an allowlist sanitizer, compose, reply, forward, CC/BCC, attachments, draft saving and reopening/editing with attachment and private BCC preservation, search and pagination.
-- Attachment upload defaults: 10 MiB per file, 20 MiB total, maximum five files. Executable/script/web page file extensions are blocked. Downloads are forced as attachments.
+The application is a webmail client and mailbox-management layer; it does not run an MTA, SMTP server, or IMAP server. CraneMail remains the email infrastructure provider. Compose supports plain text, rich-text HTML alternatives with server-side allow-list sanitization, and MIME attachments. IMAP pagination uses older/newer UID cursors scoped to each folder's UIDVALIDITY; the adapter retains offset support for compatibility. Current-page RFC conversation grouping is implemented; full-folder thread aggregation and persistent IMAP IDLE/push synchronization remain future work.
 
 ## Requirements
 
-PHP 8.1+ with PDO MySQL, OpenSSL, IMAP extension, fileinfo and sessions. MariaDB 10.5+ or MySQL 8+. SMTP and IMAP hostnames, ports, encryption modes and mailbox credentials must be supplied by the mail provider.
+PHP 8.2+, PDO MySQL, OpenSSL, DOM/XML, JSON, sessions, fileinfo, and the PHP IMAP extension (`ext-imap`) for browser webmail and attachment uploads. PHP 8.3+ is recommended for a longer supported security lifecycle. MariaDB 10.5+ or MySQL 8+. cURL is optional.
 
-## Setup
+## Quick start
 
-1. Copy `.env.example` to `.env`. Configure DB, `APP_URL`, `MAIL_DOMAIN`, `APP_KEY`, and SMTP/IMAP transport settings.
-2. Generate the app key: `php -r "echo 'base64:'.base64_encode(random_bytes(32)).PHP_EOL;"`.
-3. Import migrations in order: `database/migrations/001_initial_schema.sql`, then `database/migrations/002_login_rate_limits.sql`.
-4. Point the domain document root to `public/`; follow [cPanel installation](docs/installation-cpanel.md).
-5. Run the deployment preflight: `php bin/check-requirements.php`. Resolve every `[FAIL]` before opening the app to users. The script checks PHP extensions, APP_KEY, HTTPS and mail/database configuration; it does not test network connectivity.
-6. Create an administrator using `php bin/create-admin.php admin@example.com`; enter the password at the hidden prompt.
-7. Follow the [production go-live checklist](docs/production-go-live.md) before enabling users.
+1. Copy `.env.example` to `.env` and set DB credentials, `APP_URL`, `MAIL_DOMAIN`, SMTP/IMAP values, and a 32-byte random `APP_KEY` encoded as base64.
+2. Create a MariaDB/MySQL database and user; import `database/migrations/001_initial_schema.sql`, then `database/migrations/002_mail_send_attempts.sql`, `database/migrations/003_send_attempt_failed_state.sql`, and `database/migrations/004_login_rate_limits.sql`.
+3. Point the domain document root to `public/`. On cPanel, see [the deployment guide](docs/installation-cpanel.md).
+4. Create the first administrator: `php bin/create-admin.php admin@example.com 'A-strong-password-14'`. Create member accounts with `php bin/create-member.php member@example.com 'A-strong-password-14'`.
+5. Visit `APP_URL` and sign in.
 
-## Mail transport configuration
+## Provider modes
 
-- `MAIL_IMAP_HOST`, `MAIL_IMAP_PORT`, `MAIL_IMAP_ENCRYPTION`, `MAIL_IMAP_TIMEOUT`: encryption is `ssl`, `starttls`, or `none`; certificate verification is enabled for TLS. The timeout is 1–120 seconds.
-- `MAIL_SMTP_HOST`, `MAIL_SMTP_PORT`, `MAIL_SMTP_ENCRYPTION`, `MAIL_SMTP_TIMEOUT`: encryption is `ssl`, `starttls`, or `none`; the timeout is 1–120 seconds. Auth uses the mailbox email and password. Authenticated SMTP over `none` is blocked by default.
-- `MAIL_ALLOW_INSECURE_AUTH`: defaults to `false`; keep it disabled in production. Set to `true` only for an isolated, trusted private test relay that cannot provide TLS.
-- `MAIL_FOLDER_INBOX`, `MAIL_FOLDER_SENT`, `MAIL_FOLDER_DRAFTS`, `MAIL_FOLDER_SPAM`, `MAIL_FOLDER_TRASH`: optional exact IMAP folder paths for providers using localized or custom names. Leave Sent/Drafts/Spam/Trash blank to use common-name detection. Set these to the exact server paths (including hierarchy separators) reported by IMAP.
-- `MAIL_PAGE_SIZE`: messages per page (maximum 50).
-- `MAIL_ATTACHMENT_MAX_BYTES`, `MAIL_ATTACHMENT_TOTAL_MAX_BYTES`: per-file and per-message upload limits.
-
-The app expects the provider to expose standard IMAP and SMTP services. No CraneMail HTTP API is guessed. Provisioning, suspension and deletion through CraneMail are deliberately disabled until its official API contract and credentials are supplied and verified.
+- `MAIL_PROVIDER=manual`: safe default. Create the mailbox in CraneMail first, then register it in the admin screen. The application marks it `manual_pending`; confirm activation only after the mailbox exists at CraneMail. Manual suspension likewise requires confirmation after suspension in the provider control panel.
+- `MAIL_PROVIDER=cranemail`: enables the HTTP adapter. Configure API base URL, bearer token, and endpoint paths. The adapter contract is described in [architecture](docs/architecture.md). No API credentials are committed. Verify the contract against CraneMail's actual documentation/sandbox before enabling this mode.
 
 ## Tests
 
-- Unit: `php tests/run.php`
-- Database integration: import the migration into MariaDB/MySQL and run `php tests/integration-db.php` with `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD` set.
-- HTTP smoke: configure a temporary `.env` and run `bash tests/http-smoke.sh` to exercise login, session protection, password changes, dashboard, account, mailbox admin and member management routes.
-- Mail integration: start GreenMail with SMTP 3025, IMAP 3143, user `test@example.com` / `secret`, then run `php tests/integration-mail.php`.
-- CI starts GreenMail and MariaDB, then runs PHP lint, unit tests, database persistence/credential checks, and real IMAP/SMTP integration tests.
+Run `php tests/run.php` (64 unit tests) and lint with `find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l`. `php tests/database-send-attempts.php` applies all four migrations and exercises durable send-attempt persistence plus account/IP login throttling against a MariaDB database (set `DB_HOST`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`). `php tests/integration-mail.php` exercises IMAPS and SMTPS against GreenMail on ports 3993 and 3465, plus SMTP STARTTLS against the dedicated Python TLS-upgrade fixture in `tests/fixtures/starttls_smtp_server.py` (default port 3587). The fixtures capture accepted test messages, validate SMTP AUTH, and verify that an explicit 5xx after DATA is definitive while a lost final reply after DATA remains uncertain. The browser sync poller pauses while tabs are hidden or offline, resumes on visibility/network restoration, applies exponential retry backoff and honours both Retry-After formats, and updates its notice without duplicating links. Run `node --test tests/webmail-sync.test.js` for its five polling-behaviour checks. GitHub Actions runs lint and the unit suite on PHP 8.2–8.5, runs the database idempotency integration suite against MariaDB, and its PHP 8.5 job provisions GreenMail with a trusted ephemeral certificate and runs all protocol integration checks. GreenMail itself does not implement SMTP STARTTLS (upstream issue: https://github.com/greenmail-mail-test/greenmail/issues/135).
 
-## Security and operational notes
+## Security and limitations
 
-Use HTTPS, keep `.env` outside the web root, use a unique 32-byte app key, and restrict admin access. Failed logins are throttled per email/IP pair and per email; optional IP-wide password-spraying protection can be enabled with `LOGIN_RATE_LIMIT_IP_WIDE=true` when `REMOTE_ADDR` is the real client IP. The rate-limit table stores HMAC identifiers derived from `APP_KEY`, not raw email addresses or IP addresses. The application emits a restrictive Content Security Policy and baseline browser security headers. The application does not log mailbox passwords or SMTP/IMAP authentication exchanges. For manual mailboxes, change a mailbox password at the provider first, then use the admin credential-update form to store the new password encrypted in the application. Do not expose downloaded attachments inline. Configure PHP upload/post limits to match the app's attachment limits.
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, password-reset email, or conversation grouping across more than the nearest 2,000 folder UIDs (the selected-message conversation panel scans a bounded set of folder summaries). Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
-Still outstanding: self-service password reset, inline CID images, background push/IDLE synchronization, provider-specific folder special-use discovery, OAuth2/XOAUTH2 mail auth, multi-tenant mail server credentials, and production verification against CraneMail's real endpoints and certificates. SSO/OIDC remains deliberately out of scope.
+See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
