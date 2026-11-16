@@ -24,6 +24,9 @@ $settings = [
 $credentials = ['email' => 'test1@example.com', 'password' => 'pwd1'];
 $imap = new ImapClient();
 $smtp = new SmtpClient();
+$smtpChecker = new \\App\\Services\\SmtpConnectionChecker();
+$smtpChecker->verify($settings, $credentials);
+integrationCheck(true, 'SMTP implicit TLS authentication and NOOP connection check');
 
 $folders = $imap->folders($settings, $credentials);
 $folderNames = array_column($folders, 'name');
@@ -69,6 +72,8 @@ $startTlsSettings = $settings;
 $startTlsSettings['smtp_host'] = '127.0.0.1';
 $startTlsSettings['smtp_port'] = (int)(getenv('STARTTLS_SMTP_PORT') ?: 3587);
 $startTlsSettings['smtp_encryption'] = 'starttls';
+$smtpChecker->verify($startTlsSettings, $credentials);
+integrationCheck(true, 'SMTP STARTTLS authentication and NOOP connection check');
 $startTlsSubject = $subject . ' STARTTLS';
 $startTlsCapture = (string)(getenv('STARTTLS_SMTP_CAPTURE') ?: '/tmp/c0mmail-starttls.eml');
 @unlink($startTlsCapture);
