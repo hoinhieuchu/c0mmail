@@ -88,6 +88,17 @@ test('HTTP 429 honours Retry-After', async () => {
     assert.equal(app.nextTimer(), 120000);
 });
 
+test('HTTP-date Retry-After is supported', async () => {
+    const retryAt = new Date(Date.now() + 60000).toUTCString();
+    const app = harness(async () => ({
+        ok: false, status: 429,
+        headers: { get: name => name === 'Retry-After' ? retryAt : null }
+    }));
+    await app.flush();
+    const delay = app.nextTimer();
+    assert.ok(delay >= 59000 && delay <= 60000);
+});
+
 test('hidden tabs do not poll until they become visible', async () => {
     const app = harness(async () => ({
         ok: true, status: 200, json: async () => ({ new_count: 0 })
