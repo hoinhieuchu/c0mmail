@@ -1,1 +1,3 @@
 document.addEventListener('submit',function(e){const f=e.target;if(f.matches('[data-confirm]')&&!window.confirm(f.dataset.confirm))e.preventDefault();});
+document.addEventListener('focusin',function(e){if(e.target.matches('[data-select-on-focus]'))e.target.select();});
+document.addEventListener('change',function(e){if(e.target.matches('[data-auto-submit]')&&e.target.form)e.target.form.requestSubmit();});
