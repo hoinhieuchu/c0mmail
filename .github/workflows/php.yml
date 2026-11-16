@@ -122,6 +122,17 @@ jobs:
         with:
           php-version: "8.5"
           extensions: pdo_mysql
+      - name: Test clean-install migration runner
+        env:
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: c0mmail_install_test
+          DB_USERNAME: root
+          DB_PASSWORD: root
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE c0mmail_install_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+          php bin/migrate.php
+          php bin/migrate.php
+          test "$(mysql -N -h 127.0.0.1 -uroot -proot c0mmail_install_test -e 'SELECT COUNT(*) FROM schema_migrations')" = "4"
       - name: Test durable send attempts against MariaDB
         env:
           DB_HOST: 127.0.0.1
