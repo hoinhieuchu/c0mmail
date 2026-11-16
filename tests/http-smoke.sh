@@ -4,10 +4,8 @@ set -euo pipefail
 admin_email='ci-admin@example.test'
 admin_password='ci-password-123456789'
 member_email='ci-member@example.test'
-member_password='ci-member-password-123456'
 
 php bin/create-admin.php "$admin_email" "$admin_password"
-php bin/create-member.php "$member_email" "$member_password"
 
 php -S 127.0.0.1:18080 -t public public/index.php >/tmp/c0mmail-http.log 2>&1 &
 server_pid=$!
