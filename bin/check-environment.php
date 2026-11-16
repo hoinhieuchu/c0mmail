@@ -7,7 +7,7 @@ use App\Core\Database;
 
 if(PHP_SAPI!=='cli'){http_response_code(404);exit;}
 $errors=[];$warnings=[];$ok=[];
-$check=static function(bool $pass,string $label)use(&$errors,&$ok):void{($pass?$ok:$errors)[]=$label;};
+$check=static function(bool $pass,string $label)use(&$errors,&$ok):void{if($pass){$ok[]=$label;}else{$errors[]=$label;}};
 $warn=static function(string $label)use(&$warnings):void{$warnings[]=$label;};
 $check(PHP_VERSION_ID>=80200,'PHP 8.2 or newer');
 foreach(['pdo_mysql','imap','openssl','dom','fileinfo','json','session'] as $extension)$check(extension_loaded($extension),'PHP extension: '.$extension);
@@ -17,7 +17,7 @@ try{$config=Config::load($envPath);}catch(Throwable $e){$config=null;$errors[]='
 if($config){
     $url=(string)$config->get('APP_URL','');
     $parts=parse_url($url);
-    $check(is_array($parts)&&($parts['scheme']??'')==='https'&&!empty($parts['host'],'APP_URL uses HTTPS and has a hostname');
+    $check(is_array($parts)&&($parts['scheme']??'')==='https'&&!empty($parts['host']),'APP_URL uses HTTPS and has a hostname';
     $check(strtolower((string)$config->get('APP_ENV','production'))==='production','APP_ENV is production');
     $check(strtolower((string)$config->get('APP_DEBUG','false'))!=='true','APP_DEBUG is disabled');
     $key=(string)$config->get('APP_KEY','');$decoded=str_starts_with($key,'base64:')?base64_decode(substr($key,7),true):false;
