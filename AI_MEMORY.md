@@ -11,7 +11,7 @@
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (58 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (60 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
@@ -70,3 +70,5 @@
 - IMAP attachment fetch validates a positive UID, a bounded numeric MIME section path (max 20 levels / 64 characters), and a supported transfer encoding before opening the mailbox or fetching bytes. Unit tests cover valid and malformed references.
 
 - Mailbox update polling now uses a recursive timeout instead of a fixed interval, pauses while hidden/offline, resumes on visibility/online events, stops on pagehide, backs off transient failures up to 15 minutes, honors Retry-After delta-seconds and HTTP-date, and replaces the update notice rather than appending duplicate refresh links. Node's built-in test runner covers success/notice replacement, exponential backoff, both Retry-After forms, and hidden-tab behavior.
+
+- Full-folder conversation context is now resolved on message open through bounded IMAP HEADER searches over Message-ID, References, and In-Reply-To. The resolver caps work at 40 distinct Message-IDs and 100 messages, excludes Deleted mail, validates Message-ID syntax before building search criteria, and falls back to the current page's thread grouping if the provider search fails. GreenMail integration creates a root/reply/follow-up chain and verifies all three messages are returned from the folder even when not all are on the current page.
