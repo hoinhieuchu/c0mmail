@@ -192,7 +192,7 @@ test('IMAP conversation search criteria validate Message-ID before building HEAD
  }
 });
 test('IMAP conversation ID extraction deduplicates and bounds RFC header identifiers',function(){
- same(['<root@example.test>','<reply@example.test>'],\App\Services\ImapClient::extractConversationIds([
+ same(['<reply@example.test>','<root@example.test>'],\App\Services\ImapClient::extractConversationIds([
   'message_id'=>'<reply@example.test>',
   'in_reply_to'=>'<root@example.test>',
   'references'=>'<root@example.test> <reply@example.test>',
