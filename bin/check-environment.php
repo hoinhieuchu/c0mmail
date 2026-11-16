@@ -17,7 +17,7 @@ try{$config=Config::load($envPath);}catch(Throwable $e){$config=null;$errors[]='
 if($config){
     $url=(string)$config->get('APP_URL','');
     $parts=parse_url($url);
-    $check(is_array($parts)&&($parts['scheme']??'')==='https'&&!empty($parts['host']),'APP_URL uses HTTPS and has a hostname';
+    $check(is_array($parts)&&($parts['scheme']??'')==='https'&&!empty($parts['host']),'APP_URL uses HTTPS and has a hostname');
     $check(strtolower((string)$config->get('APP_ENV','production'))==='production','APP_ENV is production');
     $check(strtolower((string)$config->get('APP_DEBUG','false'))!=='true','APP_DEBUG is disabled');
     $key=(string)$config->get('APP_KEY','');$decoded=str_starts_with($key,'base64:')?base64_decode(substr($key,7),true):false;
