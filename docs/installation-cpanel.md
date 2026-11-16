@@ -48,7 +48,7 @@ php bin/check-environment.php
 php bin/create-admin.php admin@example.com
 ```
 
-The first preflight can warn that database tables are missing; that is expected for a fresh database. The migration runner applies `001_initial_schema.sql` through `004_login_rate_limits.sql` in order and records each completed migration in `schema_migrations`. The second preflight should have no failures. The administrator command prompts for a password without placing it in shell history; use at least 14 characters.
+The first preflight can warn that database tables are missing; that is expected for a fresh database. The migration runner applies all five numbered SQL files (including the legacy `002_login_rate_limits.sql`) in filename order and records each completed migration in `schema_migrations`. The second preflight should have no failures. The administrator command prompts for a password without placing it in shell history; use at least 14 characters.
 
 For a database that was imported manually before migration tracking was introduced, take a full backup and verify the schema contains all required tables/columns and the `failed` send-attempt state. Then run `php bin/migrate.php --baseline-existing`. The runner refuses to baseline an incomplete schema. Do not use this flag on a fresh or partially migrated database.
 
