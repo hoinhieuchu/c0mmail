@@ -18,8 +18,8 @@ jobs:
           extensions: pdo_mysql, openssl, imap, fileinfo, dom
       - name: PHP syntax check
         run: find app public bin tests -name '*.php' -print0 | xargs -0 -n1 php -l
-      - name: JavaScript syntax check
-        run: node --check public/assets/webmail-sync.js && node --check public/assets/webmail-compose.js
+      - name: JavaScript syntax and sync tests
+        run: node --check public/assets/webmail-sync.js && node --check public/assets/webmail-compose.js && node --test tests/webmail-sync.test.js
       - name: Python fixture syntax check
         run: python3 -m py_compile tests/fixtures/starttls_smtp_server.py
       - name: Automated tests
