@@ -13,7 +13,7 @@ trap 'status=$?; kill "$server_pid" 2>/dev/null || true; if [ "$status" -ne 0 ];
 
 ready=0
 for attempt in {1..30}; do
-  if curl -fsS http://127.0.0.1:18080/ -o /tmp/c0mmail-login.html; then ready=1; break; fi
+  if curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies http://127.0.0.1:18080/ -o /tmp/c0mmail-login.html; then ready=1; break; fi
   sleep 1
 done
 test "$ready" -eq 1
