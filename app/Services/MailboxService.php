@@ -68,7 +68,7 @@ final class MailboxService
         $nonce = random_bytes(12);
         $tag = '';
         $ciphertext = openssl_encrypt($secret, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
-        if ($ciphertext === false) throw new \\RuntimeException('Unable to protect one-time secret.');
+        if ($ciphertext === false) throw new \RuntimeException('Unable to protect one-time secret.');
         return [
             'password_ciphertext' => base64_encode($ciphertext),
             'password_nonce' => bin2hex($nonce),
@@ -83,10 +83,10 @@ final class MailboxService
         $nonce = hex2bin((string)($sealed['password_nonce'] ?? ''));
         $tag = hex2bin((string)($sealed['password_tag'] ?? ''));
         if ($ciphertext === false || $nonce === false || strlen($nonce) !== 12 || $tag === false || strlen($tag) !== 16) {
-            throw new \\RuntimeException('One-time secret is unavailable.');
+            throw new \RuntimeException('One-time secret is unavailable.');
         }
         $secret = openssl_decrypt($ciphertext, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
-        if ($secret === false) throw new \\RuntimeException('Unable to decrypt one-time secret.');
+        if ($secret === false) throw new \RuntimeException('Unable to decrypt one-time secret.');
         return $secret;
     }
 
