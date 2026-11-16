@@ -5,7 +5,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync('public/assets/webmail-sync.js', 'utf8');
 
-function harness(fetchImpl, visibilityState = 'visible') {
+function harness(fetchImpl, visibilityState = 'visible', now = Date.now()) {
     const timers = [];
     const documentHandlers = {};
     const windowHandlers = {};
@@ -40,6 +40,7 @@ function harness(fetchImpl, visibilityState = 'visible') {
     const context = {
         document, window, navigator: { onLine: true },
         URLSearchParams,
+        Date: class extends Date { static now() { return now; } },
         fetch: (...args) => { calls.push(args); return fetchImpl(...args); }
     };
     vm.runInNewContext(source, context);
@@ -89,14 +90,14 @@ test('HTTP 429 honours Retry-After', async () => {
 });
 
 test('HTTP-date Retry-After is supported', async () => {
-    const retryAt = new Date(Date.now() + 60000).toUTCString();
+    const fixedNow = Date.UTC(2026, 10, 16, 3, 0, 0);
+    const retryAt = new Date(fixedNow + 120000).toUTCString();
     const app = harness(async () => ({
         ok: false, status: 429,
         headers: { get: name => name === 'Retry-After' ? retryAt : null }
-    }));
+    }), 'visible', fixedNow);
     await app.flush();
-    const delay = app.nextTimer();
-    assert.ok(delay >= 59000 && delay <= 60000);
+    assert.equal(app.nextTimer(), 120000);
 });
 
 test('hidden tabs do not poll until they become visible', async () => {
