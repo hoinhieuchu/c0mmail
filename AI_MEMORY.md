@@ -1,17 +1,17 @@
 # AI Memory — c0m.me Mail / Webmail Clone
 
 ## Branch and workflow constraints
-- Active implementation branch: `feature/m2-imap-smtp-webmail`.
+- Active implementation branch: `feature/m2-webmail-installable`.
 - Do not modify `main`, merge the pull request, or change unrelated branches.
 - The owner authorized direct commits to this feature branch for implementation.
 - Keep changes scoped to the PHP MVC webmail application and its tests/docs.
 
 ## Architecture
-- Database migrations: import `database/migrations/001_initial_schema.sql` followed by `002_mail_send_attempts.sql`, `003_send_attempt_failed_state.sql`, and `004_login_rate_limits.sql`; these provide durable SMTP idempotency, safe failure retries, and persistent login throttling.
+- Database migrations: use `php bin/migrate.php` to apply all five numbered SQL migrations in order; they provide durable SMTP idempotency, safe failure retries, and persistent login throttling. Avoid maintaining a partial hand-written migration list here.
 - PHP 8.2+ MVC application; PHP 8.3+ is the recommended production baseline as PHP 8.2 security support ends 2026-12-31. MariaDB/MySQL through PDO.
 - IMAP and SMTP are adapters to the external mail provider; this project does not operate an MTA or IMAP server.
 - Mailbox credentials are encrypted at rest and must only be decrypted after ownership and active-status checks.
-- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (60 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
+- CI workflow: `.github/workflows/php.yml`; unit test runner: `php tests/run.php` (65 cases); MariaDB persistence integration runner: `php tests/database-send-attempts.php`; protocol integration runner: `php tests/integration-mail.php` against local GreenMail.
 
 ## Current implementation notes
 - IMAP listing now supports UID-based older/newer cursors scoped to UIDVALIDITY; the UI resets stale cursors when UIDVALIDITY changes. Legacy offset support remains in the adapter for compatibility.
