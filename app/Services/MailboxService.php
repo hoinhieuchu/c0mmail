@@ -62,6 +62,34 @@ final class MailboxService
             'settings' => $this->provider->connectionSettings(),
         ];
     }
+    /** Protect a one-time secret before placing it in the session flash store. */
+    public function protectTransientSecret(string $secret): array
+    {
+        $nonce = random_bytes(12);
+        $tag = '';
+        $ciphertext = openssl_encrypt($secret, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($ciphertext === false) throw new \\RuntimeException('Unable to protect one-time secret.');
+        return [
+            'password_ciphertext' => base64_encode($ciphertext),
+            'password_nonce' => bin2hex($nonce),
+            'password_tag' => bin2hex($tag),
+        ];
+    }
+
+    /** Reveal and authenticate a one-time secret; callers must immediately discard the sealed value. */
+    public function revealTransientSecret(array $sealed): string
+    {
+        $ciphertext = base64_decode((string)($sealed['password_ciphertext'] ?? ''), true);
+        $nonce = hex2bin((string)($sealed['password_nonce'] ?? ''));
+        $tag = hex2bin((string)($sealed['password_tag'] ?? ''));
+        if ($ciphertext === false || $nonce === false || strlen($nonce) !== 12 || $tag === false || strlen($tag) !== 16) {
+            throw new \\RuntimeException('One-time secret is unavailable.');
+        }
+        $secret = openssl_decrypt($ciphertext, 'aes-256-gcm', $this->encryptionKey(), OPENSSL_RAW_DATA, $nonce, $tag);
+        if ($secret === false) throw new \\RuntimeException('Unable to decrypt one-time secret.');
+        return $secret;
+    }
+
     private function encryptionKey():string
     {
         $raw=$this->config->required('APP_KEY');if(!str_starts_with($raw,'base64:'))throw new \RuntimeException('APP_KEY must use base64: prefix.');
