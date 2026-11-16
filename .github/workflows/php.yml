@@ -166,7 +166,7 @@ jobs:
           DB_PASSWORD: root
         run: |
           mysql -h 127.0.0.1 -uroot -proot -e "CREATE DATABASE c0mmail_http_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
-          printf '%s\\n' 'APP_ENV=testing' 'APP_URL=http://127.0.0.1:18080' 'APP_SESSION_NAME=c0mmail_ci' 'DB_HOST=127.0.0.1' 'DB_PORT=3306' 'DB_DATABASE=c0mmail_http_test' 'DB_USERNAME=root' 'DB_PASSWORD=root' 'MAIL_DOMAIN=example.test' 'MAIL_PROVIDER=manual' 'MAIL_SMTP_HOST=127.0.0.1' 'MAIL_SMTP_PORT=587' 'MAIL_SMTP_ENCRYPTION=starttls' 'MAIL_IMAP_HOST=127.0.0.1' 'MAIL_IMAP_PORT=993' 'MAIL_IMAP_ENCRYPTION=ssl' > .env
-          printf 'APP_KEY=base64:%s\\n' "$(php -r 'echo base64_encode(random_bytes(32));')" >> .env
+          printf '%s\n' 'APP_ENV=testing' 'APP_URL=http://127.0.0.1:18080' 'APP_SESSION_NAME=c0mmail_ci' 'DB_HOST=127.0.0.1' 'DB_PORT=3306' 'DB_DATABASE=c0mmail_http_test' 'DB_USERNAME=root' 'DB_PASSWORD=root' 'MAIL_DOMAIN=example.test' 'MAIL_PROVIDER=manual' 'MAIL_SMTP_HOST=127.0.0.1' 'MAIL_SMTP_PORT=587' 'MAIL_SMTP_ENCRYPTION=starttls' 'MAIL_IMAP_HOST=127.0.0.1' 'MAIL_IMAP_PORT=993' 'MAIL_IMAP_ENCRYPTION=ssl' > .env
+          printf 'APP_KEY=base64:%s\n' "$(php -r 'echo base64_encode(random_bytes(32));')" >> .env
           php bin/migrate.php
           bash tests/http-smoke.sh
