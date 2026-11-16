@@ -86,7 +86,7 @@ final class WebmailController
                         $folder,
                         $uid
                     );
-                } catch (\\Throwable $conversationError) {
+                } catch (\Throwable $conversationError) {
                     error_log('Webmail conversation lookup failed: ' . get_class($conversationError));
                     foreach ($messages as $thread) {
                         if (in_array($uid, $thread['thread_uids'] ?? [], true)) {
