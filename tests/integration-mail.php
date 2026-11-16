@@ -119,7 +119,32 @@ try {
 
 $messages = [];
 for ($attempt = 0; $attempt < 30; $attempt++) {
-    $messages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
+    
+$threadToken = bin2hex(random_bytes(5));
+$threadSubject = 'c0mmail cross-page conversation ' . $threadToken;
+$rootId = '<thread-root-' . $threadToken . '@example.test>';
+$replyId = '<thread-reply-' . $threadToken . '@example.test>';
+$followupId = '<thread-followup-' . $threadToken . '@example.test>';
+$threadMessages = [
+    \App\Services\MimeMessageBuilder::build($credentials['email'], [$credentials['email']], $threadSubject, 'Conversation root', null, [], [], $rootId),
+    \App\Services\MimeMessageBuilder::build($credentials['email'], [$credentials['email']], 'Re: ' . $threadSubject, 'First reply', null, [], ['in_reply_to' => $rootId, 'references' => $rootId], $replyId),
+    \App\Services\MimeMessageBuilder::build($credentials['email'], [$credentials['email']], 'Re: ' . $threadSubject, 'Second reply', null, [], ['in_reply_to' => $replyId, 'references' => $rootId . ' ' . $replyId], $followupId),
+];
+foreach ($threadMessages as $threadRaw) {
+    $imap->appendRawMessage($settings, $credentials, 'INBOX', $threadRaw, '\\Seen');
+}
+$threadRows = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $threadSubject);
+$rootRow = null;
+foreach ($threadRows as $threadRow) {
+    if ($threadRow['message_id'] === $rootId) { $rootRow = $threadRow; break; }
+}
+if ($rootRow === null) throw new RuntimeException('Unable to locate the root message of the conversation test.');
+$conversationRows = $imap->conversationMessages($settings, $credentials, 'INBOX', (int)$rootRow['uid']);
+$conversationIds = array_column($conversationRows, 'message_id');
+integrationCheck(count($conversationRows) === 3, 'IMAP conversation search resolves messages across the full folder');
+integrationCheck(in_array($rootId, $conversationIds, true) && in_array($replyId, $conversationIds, true) && in_array($followupId, $conversationIds, true), 'IMAP conversation search follows References and In-Reply-To chains');
+
+$messages = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
     if ($messages) break;
     usleep(200_000);
 }
