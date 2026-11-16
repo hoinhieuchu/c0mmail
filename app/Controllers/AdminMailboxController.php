@@ -13,6 +13,14 @@ final class AdminMailboxController
     public function index():void
     {
         $this->auth->requireAdmin();$created=$_SESSION['created_mailbox']??null;unset($_SESSION['created_mailbox']);
+        if (is_array($created) && isset($created['password_ciphertext'])) {
+            try {
+                $created['password'] = $this->service->revealTransientSecret($created);
+            } catch (\\Throwable $error) {
+                error_log('One-time mailbox password flash could not be decrypted.');
+                $created = null;
+            }
+        }
         $this->view->render('admin/mailboxes',['title'=>'Mailbox administration','members'=>$this->users->allMembers(),'mailboxes'=>$this->mailboxes->all(),'error'=>null,'created'=>$created,'providerName'=>$this->providerName]);
     }
     public function create():void
@@ -23,7 +31,7 @@ final class AdminMailboxController
             if(!preg_match('/^[a-zA-Z0-9._+-]{1,64}$/',$local))throw new \InvalidArgumentException('Local part contains unsupported characters.');
             if(strlen($password)<12)throw new \InvalidArgumentException('Mailbox password must be at least 12 characters.');
             $id=$this->service->create(['user_id'=>(int)($_POST['user_id']??0),'local_part'=>$local,'display_name'=>$name,'password'=>$password]);
-            $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain,'password'=>$password];
+            $_SESSION['created_mailbox']=['id'=>$id,'email'=>$local.'@'.$this->mailDomain]+$this->service->protectTransientSecret($password);
             header('Location: /admin/mailboxes');exit;
         } catch (\Throwable $e) {
             error_log('Mailbox registration failed: ' . get_class($e));
