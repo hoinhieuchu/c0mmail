@@ -41,6 +41,6 @@ Run `php tests/run.php` (60 unit tests) and lint with `find app public bin tests
 
 ## Security and limitations
 
-Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, password-reset email, or full-folder conversation grouping in the message-list view (the selected-message conversation panel resolves the full folder). Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
+Use HTTPS, keep `.env` outside the public web root, use a unique application key, rotate credentials, and restrict admin access. The current release does not include password reset, member self-service registration, mailbox password reset, OIDC, billing, domain verification, password-reset email, or conversation grouping across more than the nearest 2,000 folder UIDs (the selected-message conversation panel scans a bounded set of folder summaries). Verify the IMAP extension and CraneMail SMTP/IMAP settings on the target host before production launch.
 
 See [architecture](docs/architecture.md) and [cPanel installation](docs/installation-cpanel.md).
