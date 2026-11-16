@@ -141,17 +141,6 @@ foreach ($threadRows as $threadRow) {
 if ($rootRow === null) throw new RuntimeException('Unable to locate the root message of the conversation test.');
 $conversationRows = $imap->conversationMessages($settings, $credentials, 'INBOX', (int)$rootRow['uid']);
 $conversationIds = array_column($conversationRows, 'message_id');
-if (count($conversationRows) !== 3) {
-    $debugStream = @imap_open($prefix . 'INBOX', $credentials['email'], $credentials['password'], OP_READONLY);
-    $debugSearch = [];
-    if ($debugStream !== false) {
-        foreach ([$rootId, $replyId, $followupId] as $debugId) {
-            $debugSearch[$debugId] = imap_search($debugStream, 'UNDELETED TEXT "' . $debugId . '"', SE_UID) ?: [];
-        }
-        imap_close($debugStream);
-    }
-    echo 'DEBUG conversation=' . json_encode($conversationIds) . ' searches=' . json_encode($debugSearch) . "\n";
-}
 integrationCheck(count($conversationRows) === 3, 'IMAP conversation search resolves messages across the full folder');
 integrationCheck(in_array($rootId, $conversationIds, true) && in_array($replyId, $conversationIds, true) && in_array($followupId, $conversationIds, true), 'IMAP conversation search follows References and In-Reply-To chains');
 
