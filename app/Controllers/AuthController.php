@@ -22,7 +22,7 @@ final class AuthController
         }
         $validEmail = strlen($email) <= 254 && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
         $u = $validEmail ? $this->users->findByEmail($email) : null;
-        $dummyHash = '$2y$10$92IXUNpkjO0rQO5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+        $dummyHash = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
         $passwordValid = password_verify($password, (string)($u['password_hash'] ?? $dummyHash));
         if (!$u || $u['status'] !== 'active' || !$passwordValid) {
             $this->loginLimits->recordFailure($email, $ip);
