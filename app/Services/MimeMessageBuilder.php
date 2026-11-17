@@ -147,6 +147,10 @@ final class MimeMessageBuilder
 
     private static function assertHeader(string $value, bool $allowEmpty = false): void
     {
-        if ((!$allowEmpty && $value === '') || preg_match('/[\r\n\0]/', $value)) throw new \InvalidArgumentException('Invalid email header value.');
+        if ((!$allowEmpty && $value === '')
+            || preg_match('/[\x00-\x08\x0A-\x1F\x7F]/', $value)
+            || preg_match('//u', $value) !== 1) {
+            throw new \InvalidArgumentException('Invalid email header value.');
+        }
     }
 }
