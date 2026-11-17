@@ -423,18 +423,15 @@ final class ImapClient
 
     private function collectParts($stream, int $uid, $structure, string $section, array &$parts, array &$attachments): void
     {
-        if (!empty($structure->parts)) {
-            foreach ($structure->parts as $index => $part) {
-                $partSection = $section === '' ? (string)($index + 1) : $section . '.' . ($index + 1);
-                $this->collectParts($stream, $uid, $part, $partSection, $parts, $attachments);
-            }
-            return;
-        }
         $subtype = strtolower((string)($structure->subtype ?? 'plain'));
         $type = (int)($structure->type ?? 0);
         $filename = $this->partFilename($structure);
         $disposition = strtolower((string)($structure->disposition ?? ''));
-        if ($filename !== '' || $disposition === 'attachment' || ($type !== 0 && $type !== 1) || ($type === 0 && !in_array($subtype, ['plain', 'html'], true))) {
+
+        // An attached message/rfc822 may itself contain a multipart tree. Treat
+        // the enclosing part as one attachment before considering its children;
+        // otherwise its inner text can be mistaken for this message's body.
+        if (self::isAttachmentPart($type, $subtype, $filename, $disposition)) {
             $attachments[] = [
                 'section' => $section === '' ? '1' : $section,
                 'filename' => $filename !== '' ? $this->decodeHeader($filename) : 'attachment-' . (count($attachments) + 1),
@@ -465,6 +462,19 @@ final class ImapClient
             $body = mb_convert_encoding($body, 'UTF-8', $charset);
         }
         $parts[] = ['type' => $subtype, 'body' => $body];
+    }
+
+    /**
+     * Multipart containers are traversed unless the container itself is an
+     * attachment. Non-text leaf types (including message/rfc822) are files.
+     */
+    public static function isAttachmentPart(int $type, string $subtype, string $filename, string $disposition): bool
+    {
+        $subtype = strtolower($subtype);
+        $disposition = strtolower($disposition);
+        if ($filename !== '' || $disposition === 'attachment') return true;
+        if ($type === 1) return false;
+        return $type !== 0 || !in_array($subtype, ['plain', 'html'], true);
     }
 
     private function normalizeParameters($parameters): array
