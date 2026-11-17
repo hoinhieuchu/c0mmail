@@ -1,9 +1,10 @@
 # AI Memory — c0m.me Mail / Webmail Clone
 
 ## Branch and workflow constraints
-- Active implementation branch: `feature/m2-webmail-installable`.
-- Do not modify `main`, merge the pull request, or change unrelated branches.
-- The owner authorized direct commits to this feature branch for implementation.
+- Active implementation branch: `hardening/post-merge-readiness` (created from `main` after Milestone 2 merge).
+- Milestone 2 PR #6 is merged; merge commit: `82fcca325cfb107ec1d93cdff92f9877b193c95c`.
+- Do not commit directly to `main`. Keep post-merge hardening changes on the active feature branch and submit a pull request for review.
+- The owner authorized direct commits to feature branches for implementation.
 - Keep changes scoped to the PHP MVC webmail application and its tests/docs.
 
 ## Architecture
