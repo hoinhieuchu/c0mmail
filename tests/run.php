@@ -229,4 +229,11 @@ test('password policy rejects null bytes and oversized values',function(){
  same('Password contains an unsupported null character.',$policy->validate("valid-long-password\0suffix"));
  same('Password must not exceed 1024 bytes.',$policy->validate(str_repeat('a',1025)));
 });
+test('IMAP attachment download rejects stale or invalid UIDVALIDITY values',function(){
+ \App\Services\ImapClient::validateUidValidity(12345,12345);
+ foreach([[0,1],[1,0],[12345,12346]] as [$expected,$actual]){
+  try{\App\Services\ImapClient::validateUidValidity($expected,$actual);throw new RuntimeException('Expected UIDVALIDITY mismatch rejection');}
+  catch(RuntimeException $e){same(true,str_contains($e->getMessage(),'mailbox changed'));}
+ }
+});
 echo "{$count} tests passed.\n";
