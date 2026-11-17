@@ -54,16 +54,16 @@ test('submission state marks stale in-flight attempts uncertain',function(){same
 test('submission state treats legacy or unknown states as uncertain',function(){same('uncertain',\App\Services\SubmissionState::classify(['status'=>'sending'],100));same('uncertain',\App\Services\SubmissionState::classify(['status'=>'unexpected'],100));});
 
 test('IMAP MIME parser keeps attached message/rfc822 as one attachment',function(){
- $method=new ReflectionMethod(\\App\\Services\\ImapClient::class,'isAttachmentPart');
- same(true,$method->invoke(null,2,'rfc822','forwarded.eml',''));
- same(true,$method->invoke(null,1,'mixed','forwarded.eml','inline'));
- same(true,$method->invoke(null,1,'mixed','','attachment'));
- same(false,$method->invoke(null,1,'related','',''));
- same(false,$method->invoke(null,1,'alternative','',''));
- same(false,$method->invoke(null,0,'plain','',''));
- same(false,$method->invoke(null,0,'html','',''));
- same(true,$method->invoke(null,0,'calendar','',''));
- same(true,$method->invoke(null,5,'octet-stream','',''));
+ $class='App\\Services\\ImapClient';
+ same(true,$class::isAttachmentPart(2,'rfc822','forwarded.eml',''));
+ same(true,$class::isAttachmentPart(1,'mixed','forwarded.eml','inline'));
+ same(true,$class::isAttachmentPart(1,'mixed','','attachment'));
+ same(false,$class::isAttachmentPart(1,'related','',''));
+ same(false,$class::isAttachmentPart(1,'alternative','',''));
+ same(false,$class::isAttachmentPart(0,'plain','',''));
+ same(false,$class::isAttachmentPart(0,'html','',''));
+ same(true,$class::isAttachmentPart(0,'calendar','',''));
+ same(true,$class::isAttachmentPart(5,'octet-stream','',''));
 });
 test('IMAP attachment decoder preserves ENCOTHER transfer data',function(){same('opaque payload',\App\Services\ImapClient::decodeTransferEncoding('opaque payload',5));});
 test('IMAP attachment decoder handles base64 and quoted-printable',function(){same('binary data',\App\Services\ImapClient::decodeTransferEncoding(base64_encode('binary data'),3));same('hello world',\App\Services\ImapClient::decodeTransferEncoding('hello=20world',4));});
