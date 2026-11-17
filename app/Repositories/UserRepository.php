@@ -30,4 +30,30 @@ final class UserRepository
             throw $error;
         }
     }
+
+    /**
+     * Replace an active account password from a trusted server-side CLI
+     * operation. Incrementing auth_version revokes every existing session.
+     */
+    public function resetPasswordHash(int $id, string $newHash): ?int
+    {
+        $this->db->beginTransaction();
+        try {
+            $update = $this->db->prepare("UPDATE users SET password_hash=?, auth_version=auth_version+1 WHERE id=? AND status='active'");
+            $update->execute([$newHash, $id]);
+            if ($update->rowCount() !== 1) {
+                $this->db->commit();
+                return null;
+            }
+            $select = $this->db->prepare('SELECT auth_version FROM users WHERE id=?');
+            $select->execute([$id]);
+            $version = $select->fetchColumn();
+            if ($version === false) throw new \RuntimeException('Updated account version could not be read.');
+            $this->db->commit();
+            return (int)$version;
+        } catch (\Throwable $error) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $error;
+        }
+    }
 }

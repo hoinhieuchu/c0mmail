@@ -74,5 +74,6 @@ The hosting provider must allow outbound TCP connections to the configured IMAP 
 - Back up the database and the `.env` application key together. Database backups without the matching `APP_KEY` cannot restore mailbox credentials.
 - Do not enable `APP_DEBUG` on a public server. Review PHP/web-server logs rather than displaying exception details to users.
 - Restrict administrator accounts and use unique strong passwords.
+- To recover an active local account, run `php bin/reset-password.php user@example.com` from the private application directory. Enter the replacement password at the hidden terminal prompt. The command increments the account authentication version and revokes all existing sessions. It is a server-side administrator tool, not an email-based self-service reset flow.
 - Test restore procedures before accepting real users.
 - This application is a webmail client; it does not provide SMTP/IMAP server infrastructure or operate an MTA.
