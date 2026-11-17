@@ -211,4 +211,11 @@ test('IMAP conversation lookup enforces bounded result limits',function(){
   catch(InvalidArgumentException $e){same('Invalid conversation message limit.',$e->getMessage());}
  }
 });
+test('IMAP attachment download rejects stale or invalid UIDVALIDITY values',function(){
+ \App\Services\ImapClient::validateUidValidity(12345,12345);
+ foreach([[0,1],[1,0],[12345,12346]] as [$expected,$actual]){
+  try{\App\Services\ImapClient::validateUidValidity($expected,$actual);throw new RuntimeException('Expected UIDVALIDITY mismatch rejection');}
+  catch(RuntimeException $e){same(true,str_contains($e->getMessage(),'mailbox changed'));}
+ }
+});
 echo "{$count} tests passed.\n";
