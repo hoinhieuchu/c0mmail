@@ -20,8 +20,8 @@ try{
  $mailboxId=$mailboxes->create(['user_id'=>$userId,'email'=>$mailboxEmail,'display_name'=>'Test mailbox','provider'=>'manual','provider_id'=>null,'status'=>'active','ciphertext'=>base64_encode($cipher),'nonce'=>bin2hex($nonce),'tag'=>bin2hex($tag)]);
  dbCheck($mailboxes->findForUser($mailboxId,$userId)!==null,'Mailbox ownership lookup works');dbCheck($mailboxes->findForUser($mailboxId,$userId+1)===null,'Mailbox credentials are scoped to their owner');
  $config=new Config(['APP_KEY'=>'base64:'.base64_encode($key)]);$credentialService=new MailboxCredentialService($mailboxes,$config);dbCheck($credentialService->forUser($mailboxId,$userId)['password']==='mailbox-secret-one','AES-256-GCM mailbox credentials decrypt for the owning member');dbCheck($credentialService->forAdmin($mailboxId)['password']==='mailbox-secret-one','Admin-only mailbox connection test can decrypt active mailbox credentials');
- $nonce2=random_bytes(12);$tag2='';$cipher2=openssl_encrypt('mailbox-secret-two','aes-256-gcm',$key,OPENSSL_RAW_DATA,$nonce2,$tag2);$mailboxes->updateCredentials($mailboxId,base64_encode($cipher2),bin2hex($nonce2),bin2hex($tag2));
- dbCheck($credentialService->forUser($mailboxId,$userId)['password']==='mailbox-secret-two','Rotated mailbox credentials persist and decrypt correctly');
+ $storedMailbox=$mailboxes->find($mailboxId);dbCheck(is_array($storedMailbox)&&$storedMailbox['password_ciphertext']!==base64_encode('mailbox-secret-one'),'Mailbox passwords are stored as authenticated ciphertext, not plaintext');
+ try{(new MailboxCredentialService($mailboxes,new Config(['APP_KEY'=>'base64:'.base64_encode(random_bytes(32))])))->forUser($mailboxId,$userId);throw new RuntimeException('Expected wrong-key decryption failure');}catch(RuntimeException $e){dbCheck(str_contains($e->getMessage(),'decryption failed'),'Mailbox credential decryption fails closed with a wrong application key');}
 }finally{
  if($mailboxId>0){$s=$pdo->prepare('DELETE FROM mailboxes WHERE id=?');$s->execute([$mailboxId]);}
  if($userId>0){$s=$pdo->prepare('DELETE FROM users WHERE id=?');$s->execute([$userId]);}
