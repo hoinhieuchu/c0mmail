@@ -36,6 +36,44 @@ grep -qi '^X-Frame-Options: DENY' /tmp/c0mmail-dashboard-headers
 grep -qi '^Content-Security-Policy:' /tmp/c0mmail-dashboard-headers
 grep -qi '^Cache-Control: private, no-store' /tmp/c0mmail-dashboard-headers
 
+# Establish a second authenticated browser session to verify global revocation.
+curl -fsS -c /tmp/c0mmail-cookies-second -b /tmp/c0mmail-cookies-second http://127.0.0.1:18080/login -o /tmp/c0mmail-login-second.html
+csrf_second=$(grep -oP 'name="_csrf" value="\\K[^"]+' /tmp/c0mmail-login-second.html | head -n1)
+curl -fsS -c /tmp/c0mmail-cookies-second -b /tmp/c0mmail-cookies-second -D /tmp/c0mmail-login-second-headers -o /dev/null \
+  -X POST http://127.0.0.1:18080/login \
+  --data-urlencode "_csrf=$csrf_second" \
+  --data-urlencode "email=$admin_email" \
+  --data-urlencode "password=$admin_password"
+grep -qi '^Location: /dashboard' /tmp/c0mmail-login-second-headers
+
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/account/password -o /tmp/c0mmail-account-password.html
+grep -q 'Change password' /tmp/c0mmail-account-password.html
+csrf=$(grep -oP 'name="_csrf" value="\\K[^"]+' /tmp/c0mmail-account-password.html | head -n1)
+new_password='ci-admin-new-password-123456'
+curl -fsS -c /tmp/c0mmail-cookies -b /tmp/c0mmail-cookies -o /tmp/c0mmail-password-changed.html \
+  -X POST http://127.0.0.1:18080/account/password \
+  --data-urlencode "_csrf=$csrf" \
+  --data-urlencode "current_password=$admin_password" \
+  --data-urlencode "new_password=$new_password" \
+  --data-urlencode "confirm_password=$new_password"
+grep -q 'Your password has been updated' /tmp/c0mmail-password-changed.html
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/dashboard -o /tmp/c0mmail-dashboard-after-password.html
+grep -q 'Your mailboxes' /tmp/c0mmail-dashboard-after-password.html
+
+curl -sS -b /tmp/c0mmail-cookies-second -D /tmp/c0mmail-old-session-headers -o /dev/null http://127.0.0.1:18080/dashboard
+grep -qi '^Location: /login' /tmp/c0mmail-old-session-headers
+curl -fsS -c /tmp/c0mmail-cookies-second -b /tmp/c0mmail-cookies-second http://127.0.0.1:18080/login -o /tmp/c0mmail-login-new-password.html
+csrf_second=$(grep -oP 'name="_csrf" value="\\K[^"]+' /tmp/c0mmail-login-new-password.html | head -n1)
+curl -fsS -c /tmp/c0mmail-cookies-second -b /tmp/c0mmail-cookies-second -D /tmp/c0mmail-new-login-headers -o /dev/null \
+  -X POST http://127.0.0.1:18080/login \
+  --data-urlencode "_csrf=$csrf_second" \
+  --data-urlencode "email=$admin_email" \
+  --data-urlencode "password=$new_password"
+grep -qi '^Location: /dashboard' /tmp/c0mmail-new-login-headers
+
+curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/admin/members -o /tmp/c0mmail-admin-members.html
+grep -q 'Member administration' /tmp/c0mmail-admin-members.html
+
 curl -fsS -b /tmp/c0mmail-cookies http://127.0.0.1:18080/admin/mailboxes -o /tmp/c0mmail-admin.html
 grep -q 'Mailbox administration' /tmp/c0mmail-admin.html
 member_id=$(grep -oP '<option value="\K[0-9]+(?=">'"$member_email"'</option>)' /tmp/c0mmail-admin.html | head -n1)
