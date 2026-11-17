@@ -213,14 +213,14 @@ test('IMAP conversation lookup enforces bounded result limits',function(){
 });
 
 test('password policy requires at least 14 Unicode characters',function(){
- $policy=new \\App\\Services\\PasswordPolicy();
+ $policy=new \App\Services\PasswordPolicy();
  same(null,$policy->validate('correct horse battery staple'));
  same('Password must be at least 14 characters long.',$policy->validate('short'));
  same(null,$policy->validate('mật khẩu đủ dài cho người dùng'));
 });
 test('password policy rejects null bytes and oversized values',function(){
- $policy=new \\App\\Services\\PasswordPolicy();
- same('Password contains an unsupported null character.',$policy->validate("valid-long-password\\0suffix"));
+ $policy=new \App\Services\PasswordPolicy();
+ same('Password contains an unsupported null character.',$policy->validate("valid-long-password\0suffix"));
  same('Password must not exceed 1024 bytes.',$policy->validate(str_repeat('a',1025)));
 });
 echo "{$count} tests passed.\n";
