@@ -30,6 +30,12 @@ test('IMAP UID cursors reject conflicting and invalid ranges',function(){foreach
 test('MIME builder supports empty subject and plain text bodies',function(){ $raw=\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'','hello'); same(true,str_contains($raw,'Content-Type: text/plain; charset=UTF-8')); same(true,str_contains($raw,'hello'));});
 test('MIME builder emits multipart HTML and base64 attachments',function(){ $raw=\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Hello','plain','<p>html</p>',[['filename'=>'report.txt','mime'=>'text/plain','data'=>'attachment payload']]); same(true,str_contains($raw,'multipart/mixed')); same(true,str_contains($raw,'multipart/alternative')); same(true,str_contains($raw,base64_encode('attachment payload')));});
 test('MIME builder rejects header injection in subjects',function(){try{\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],"Hi\r\nBcc: attacker@example.test",'body');throw new RuntimeException('Expected MIME header validation');}catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'header'));}});
+test('MIME builder rejects non-whitespace control bytes and invalid UTF-8 in headers',function(){
+ foreach(["subject".chr(11)."break","subject".chr(12)."break","subject".chr(27)."break","subject".chr(127)."break","invalid ".chr(255)] as $subject){
+  try{\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],$subject,'body');throw new RuntimeException('Expected invalid header rejection');}
+  catch(InvalidArgumentException $e){same(true,str_contains($e->getMessage(),'header'));}
+ }
+});
 
 test('MIME builder preserves reply threading headers',function(){ $raw=\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Re: Hello','reply',null,[],['in_reply_to'=>'<one@example.test>','references'=>'<one@example.test>']); same(true,str_contains($raw,'In-Reply-To: <one@example.test>')); same(true,str_contains($raw,'References: <one@example.test>'));});
 test('MIME builder accepts a stable validated Message-ID',function(){ $raw=\App\Services\MimeMessageBuilder::build('user@example.test',['to@example.test'],'Hello','body',null,[],[],'<submission-123@c0m.me>'); same(true,str_contains($raw,'Message-ID: <submission-123@c0m.me>'));});
