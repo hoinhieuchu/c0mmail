@@ -301,13 +301,26 @@ final class ImapClient
         }
     }
 
-    public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
+    public static function validateUidValidity(int $expected, int $actual): void
+    {
+        if ($expected < 1 || $actual < 1 || $expected !== $actual) {
+            throw new \RuntimeException('The mailbox changed while this attachment link was open. Reload the message and try again.');
+        }
+    }
+
+    public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding, ?int $expectedUidValidity = null): string
     {
         $this->requireExtension();
         self::validateAttachmentReference($uid, $section, $encoding);
         self::validateFolderName($folder);
-        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
+        $mailbox = $this->prefix($settings) . $this->encodeFolder($folder);
+        $stream = $this->open($mailbox, $credentials, OP_READONLY);
         try {
+            if ($expectedUidValidity !== null) {
+                $status = imap_status($stream, $mailbox, SA_UIDVALIDITY);
+                if ($status === false) throw new \RuntimeException('IMAP server did not provide UIDVALIDITY for attachment download.');
+                self::validateUidValidity($expectedUidValidity, (int)($status->uidvalidity ?? 0));
+            }
             $raw = imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
             if ($raw === false) throw new \RuntimeException('Attachment data could not be retrieved.');
             $raw = self::decodeTransferEncoding($raw, $encoding);
