@@ -78,6 +78,7 @@ final class WebmailController
             $relatedMessages = [];
             $uid = (int)($_GET['uid'] ?? 0);
             if ($uid > 0) {
+                ImapClient::validateUidValidity((int)($_GET['uidvalidity'] ?? 0), $uidValidity);
                 $selected = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
                 try {
                     $relatedMessages = $this->imap->conversationMessages(
@@ -307,15 +308,19 @@ final class WebmailController
             $uid = (int)($_GET['uid'] ?? 0);
             $folder = (string)($_GET['folder'] ?? 'INBOX');
             $section = (string)($_GET['section'] ?? '');
+            $expectedUidValidity = (int)($_GET['uidvalidity'] ?? 0);
+            if ($expectedUidValidity < 1) throw new \InvalidArgumentException('This attachment link has expired. Reload the message and try again.');
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
             if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
+            $currentUidValidity = $this->imap->uidValidity($context['settings'], $context['credentials'], $folder);
+            ImapClient::validateUidValidity($expectedUidValidity, $currentUidValidity);
             $message = $this->imap->getMessage($context['settings'], $context['credentials'], $folder, $uid);
             $attachment = null;
             foreach ($message['attachments'] as $item) if ($item['section'] === $section) { $attachment = $item; break; }
             if ($attachment === null) { http_response_code(404); exit('Attachment not found.'); }
             if ((int)$attachment['size'] > 25_000_000) { http_response_code(413); exit('Attachment exceeds the 25 MB download limit.'); }
-            $data = $this->imap->fetchAttachment($context['settings'], $context['credentials'], $folder, $uid, $section, (int)$attachment['encoding']);
+            $data = $this->imap->fetchAttachment($context['settings'], $context['credentials'], $folder, $uid, $section, (int)$attachment['encoding'], $expectedUidValidity);
             $filename = basename(str_replace('\\', '/', (string)$attachment['filename']));
             $filename = preg_replace('/[\x00-\x1F\x7F]/', '_', $filename);
             if ($filename === '' || $filename === '.' || $filename === '..') $filename = 'attachment.bin';
@@ -403,12 +408,14 @@ final class WebmailController
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $uid = (int)($_POST['uid'] ?? 0);
             $folder = (string)($_POST['folder'] ?? 'INBOX');
+            $uidValidity = (int)($_POST['uidvalidity'] ?? 0);
+            if ($uidValidity < 1) throw new \InvalidArgumentException('This message action has expired. Refresh the folder and try again.');
             $flag = (string)($_POST['flag'] ?? '');
             $enabled = (string)($_POST['enabled'] ?? '1') === '1';
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
             if (!in_array($folder, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
-            $this->imap->setFlag($context['settings'], $context['credentials'], $folder, $uid, $flag, $enabled);
+            $this->imap->setFlag($context['settings'], $context['credentials'], $folder, $uid, $flag, $enabled, $uidValidity);
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($folder) . '&flagged=1');
             exit;
         } catch (\Throwable $e) {
@@ -424,12 +431,14 @@ final class WebmailController
             $mailboxId = (int)($_POST['mailbox_id'] ?? 0);
             $uid = (int)($_POST['uid'] ?? 0);
             $source = (string)($_POST['source'] ?? 'INBOX');
+            $uidValidity = (int)($_POST['uidvalidity'] ?? 0);
+            if ($uidValidity < 1) throw new \InvalidArgumentException('This message action has expired. Refresh the folder and try again.');
             $destination = (string)($_POST['destination'] ?? '');
             if (!in_array($destination, ['Trash','Deleted Items','Spam','Junk'], true)) throw new \InvalidArgumentException('Unsupported destination folder.');
             $context = $this->mailboxService->credentialsForUser($mailboxId, (int)$user['id']);
             $folders = array_column($this->imap->folders($context['settings'], $context['credentials']), 'name');
             if (!in_array($source, $folders, true) || !in_array($destination, $folders, true)) throw new \InvalidArgumentException('The selected IMAP folder does not exist.');
-            $this->imap->move($context['settings'], $context['credentials'], $source, $uid, $destination);
+            $this->imap->move($context['settings'], $context['credentials'], $source, $uid, $destination, $uidValidity);
             header('Location: /mail?mailbox=' . $mailboxId . '&folder=' . rawurlencode($source) . '&moved=1');
             exit;
         } catch (\Throwable $e) {
@@ -472,6 +481,7 @@ final class WebmailController
             || str_contains($message, 'delivery status is uncertain')) {
             return 'The SMTP delivery status may be uncertain. Check the Sent folder before attempting another send.';
         }
+        if (str_contains($message, 'mailbox changed')) return 'This message link is out of date. Refresh the folder and open the message again.';
         if (str_contains($message, 'Active mailbox not found')) return 'The selected mailbox is unavailable or inactive.';
         return 'The mail operation could not be completed. Check the mail server settings and application logs.';
     }

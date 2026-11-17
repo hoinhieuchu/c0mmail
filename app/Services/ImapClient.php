@@ -301,13 +301,26 @@ final class ImapClient
         }
     }
 
-    public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding): string
+    public static function validateUidValidity(int $expected, int $actual): void
+    {
+        if ($expected < 1 || $actual < 1 || $expected !== $actual) {
+            throw new \RuntimeException('The mailbox changed while this attachment link was open. Reload the message and try again.');
+        }
+    }
+
+    public function fetchAttachment(array $settings, array $credentials, string $folder, int $uid, string $section, int $encoding, ?int $expectedUidValidity = null): string
     {
         $this->requireExtension();
         self::validateAttachmentReference($uid, $section, $encoding);
         self::validateFolderName($folder);
-        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, OP_READONLY);
+        $mailbox = $this->prefix($settings) . $this->encodeFolder($folder);
+        $stream = $this->open($mailbox, $credentials, OP_READONLY);
         try {
+            if ($expectedUidValidity !== null) {
+                $status = imap_status($stream, $mailbox, SA_UIDVALIDITY);
+                if ($status === false) throw new \RuntimeException('IMAP server did not provide UIDVALIDITY for attachment download.');
+                self::validateUidValidity($expectedUidValidity, (int)($status->uidvalidity ?? 0));
+            }
             $raw = imap_fetchbody($stream, $uid, $section, FT_UID | FT_PEEK);
             if ($raw === false) throw new \RuntimeException('Attachment data could not be retrieved.');
             $raw = self::decodeTransferEncoding($raw, $encoding);
@@ -348,13 +361,19 @@ final class ImapClient
     }
 
 
-    public function setFlag(array $settings, array $credentials, string $folder, int $uid, string $flag, bool $enabled): void
+    public function setFlag(array $settings, array $credentials, string $folder, int $uid, string $flag, bool $enabled, ?int $expectedUidValidity = null): void
     {
         $this->requireExtension();
         self::validateFolderName($folder);
         if ($uid < 1 || !in_array($flag, ['Seen', 'Flagged'], true)) throw new \InvalidArgumentException('Unsupported message flag operation.');
-        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($folder), $credentials, 0);
+        $mailbox = $this->prefix($settings) . $this->encodeFolder($folder);
+        $stream = $this->open($mailbox, $credentials, 0);
         try {
+            if ($expectedUidValidity !== null) {
+                $status = imap_status($stream, $mailbox, SA_UIDVALIDITY);
+                if ($status === false) throw new \RuntimeException('IMAP server did not provide UIDVALIDITY for message flag update.');
+                self::validateUidValidity($expectedUidValidity, (int)($status->uidvalidity ?? 0));
+            }
             $flags = '\\' . $flag;
             $ok = $enabled
                 ? imap_setflag_full($stream, (string)$uid, $flags, ST_UID)
@@ -363,14 +382,20 @@ final class ImapClient
         } finally { imap_close($stream); }
     }
 
-    public function move(array $settings, array $credentials, string $source, int $uid, string $destination): void
+    public function move(array $settings, array $credentials, string $source, int $uid, string $destination, ?int $expectedUidValidity = null): void
     {
         $this->requireExtension();
         if ($uid < 1) throw new \InvalidArgumentException('Invalid message identifier.');
         self::validateFolderName($source);
         self::validateFolderName($destination);
-        $stream = $this->open($this->prefix($settings) . $this->encodeFolder($source), $credentials, 0);
+        $sourceMailbox = $this->prefix($settings) . $this->encodeFolder($source);
+        $stream = $this->open($sourceMailbox, $credentials, 0);
         try {
+            if ($expectedUidValidity !== null) {
+                $status = imap_status($stream, $sourceMailbox, SA_UIDVALIDITY);
+                if ($status === false) throw new \RuntimeException('IMAP server did not provide UIDVALIDITY for message move.');
+                self::validateUidValidity($expectedUidValidity, (int)($status->uidvalidity ?? 0));
+            }
             if (!imap_mail_move($stream, (string)$uid, $this->encodeFolder($destination), CP_UID)) {
                 throw new \RuntimeException('Unable to move message: ' . $this->lastError());
             }

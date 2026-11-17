@@ -161,13 +161,14 @@ integrationCheck($message['seen'] === true, 'getMessage marks opened messages as
 integrationCheck(count($message['attachments']) === 1, 'IMAP MIME attachment discovery');
 integrationCheck($message['attachments'][0]['filename'] === 'báo-cáo-tháng.txt', 'RFC 2231 Unicode attachment filename round-trip');
 $attachment = $message['attachments'][0];
-$downloaded = $imap->fetchAttachment($settings, $credentials, 'INBOX', $uid, $attachment['section'], (int)$attachment['encoding']);
+$attachmentUidValidity = $imap->uidValidity($settings, $credentials, 'INBOX');
+$downloaded = $imap->fetchAttachment($settings, $credentials, 'INBOX', $uid, $attachment['section'], (int)$attachment['encoding'], $attachmentUidValidity);
 integrationCheck($downloaded === $attachmentData, 'IMAP attachment transfer decoding');
 
-$imap->setFlag($settings, $credentials, 'INBOX', $uid, 'Flagged', true);
+$imap->setFlag($settings, $credentials, 'INBOX', $uid, 'Flagged', true, $attachmentUidValidity);
 $flagged = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
 integrationCheck(!empty($flagged[0]['flagged']), 'IMAP flagged state update');
-$imap->setFlag($settings, $credentials, 'INBOX', $uid, 'Seen', false);
+$imap->setFlag($settings, $credentials, 'INBOX', $uid, 'Seen', false, $attachmentUidValidity);
 $unread = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
 integrationCheck(empty($unread[0]['seen']), 'IMAP seen state update');
 
@@ -197,7 +198,7 @@ try {
     imap_close($deleteStream);
 }
 
-$imap->move($settings, $credentials, 'INBOX', $uid, 'Trash');
+$imap->move($settings, $credentials, 'INBOX', $uid, 'Trash', $attachmentUidValidity);
 $inboxAfterMove = $imap->listMessages($settings, $credentials, 'INBOX', 10, 0, $subject);
 $trash = $imap->listMessages($settings, $credentials, 'Trash', 10, 0, $subject);
 $verifyStream = @imap_open($inboxPrefix . 'INBOX', $credentials['email'], $credentials['password'], OP_READONLY);
