@@ -16,29 +16,25 @@ final class AuthController
         $email = strtolower(trim((string)($_POST['email'] ?? '')));
         $password = (string)($_POST['password'] ?? '');
         $ip = ClientIpResolver::resolve($_SERVER, $this->trustedProxyCidrs);
-
         if ($this->loginLimits->isBlocked($email, $ip)) {
             $this->view->render('login', ['title'=>'Sign in', 'error'=>'Email or password is incorrect.']);
             return;
         }
-
         $validEmail = strlen($email) <= 254 && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
         $u = $validEmail ? $this->users->findByEmail($email) : null;
-        // Verify a fixed dummy hash for unknown/invalid accounts to reduce timing-based enumeration.
-        $dummyHash = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
+        $dummyHash = '$2y$10$92IXUNpkjO0rQO5byMi.Ye4oKoEa3Ro9llC/.og/at2uheWG/igi.';
         $passwordValid = password_verify($password, (string)($u['password_hash'] ?? $dummyHash));
-
         if (!$u || $u['status'] !== 'active' || !$passwordValid) {
             $this->loginLimits->recordFailure($email, $ip);
             $this->view->render('login', ['title'=>'Sign in', 'error'=>'Email or password is incorrect.']);
             return;
         }
-
         $this->loginLimits->clearAccount($email);
         session_regenerate_id(true);
         $_SESSION = [
             '_csrf' => bin2hex(random_bytes(32)),
             'user_id' => (int)$u['id'],
+            'auth_version' => (int)$u['auth_version'],
             'auth_created_at' => time(),
             'auth_last_activity' => time(),
         ];
