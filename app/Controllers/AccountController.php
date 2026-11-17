@@ -40,12 +40,12 @@ final class AccountController
             return;
         }
         $newHash = password_hash($new, PASSWORD_DEFAULT);
-        if (!$this->users->updatePasswordHash($id, $currentHash, $newHash)) {
+        $newVersion = $this->users->updatePasswordHash($id, $currentHash, $newHash);
+        if ($newVersion === null) {
             $this->renderPasswordPage($user, 'The password changed in another request. Reload and try again.', null);
             return;
         }
-        $newVersion = $this->users->authVersionForId($id);
-        if ($newVersion === null) {
+        if ($newVersion < 1) {
             $_SESSION = [];
             session_regenerate_id(true);
             header('Location: /login');
