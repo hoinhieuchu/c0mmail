@@ -441,6 +441,13 @@ final class ImapClient
             ];
             return;
         }
+        if (!empty($structure->parts)) {
+            foreach ($structure->parts as $index => $part) {
+                $partSection = $section === '' ? (string)($index + 1) : $section . '.' . ($index + 1);
+                $this->collectParts($stream, $uid, $part, $partSection, $parts, $attachments);
+            }
+            return;
+        }
         if ($type !== 0 || !in_array($subtype, ['plain', 'html'], true)) return;
         $raw = $section === ''
             ? imap_body($stream, $uid, FT_UID | FT_PEEK)
