@@ -12,6 +12,22 @@ final class UserRepository
     public function allAccounts():array{return $this->db->query('SELECT id,email,display_name,role,status,created_at FROM users ORDER BY role,email')->fetchAll();}
     public function setMemberStatus(int $id,string $status):void{if(!in_array($status,['active','suspended'],true))throw new \InvalidArgumentException('Invalid member status.');$s=$this->db->prepare("UPDATE users SET status=?, auth_version=auth_version+1 WHERE id=? AND role='member'");$s->execute([$status,$id]);}
     public function passwordHashForId(int $id):?string{$s=$this->db->prepare("SELECT password_hash FROM users WHERE id=? AND status='active'");$s->execute([$id]);$hash=$s->fetchColumn();return is_string($hash)?$hash:null;}
-    public function updatePasswordHash(int $id,string $expectedHash,string $newHash):bool{$s=$this->db->prepare("UPDATE users SET password_hash=?, auth_version=auth_version+1 WHERE id=? AND password_hash=? AND status='active'");$s->execute([$newHash,$id,$expectedHash]);return $s->rowCount()===1;}
-    public function authVersionForId(int $id):?int{$s=$this->db->prepare("SELECT auth_version FROM users WHERE id=? AND status='active'");$s->execute([$id]);$version=$s->fetchColumn();return $version===false?null:(int)$version;}
+    public function updatePasswordHash(int $id,string $expectedHash,string $newHash):?int
+    {
+        $this->db->beginTransaction();
+        try {
+            $update=$this->db->prepare("UPDATE users SET password_hash=?, auth_version=auth_version+1 WHERE id=? AND password_hash=? AND status='active'");
+            $update->execute([$newHash,$id,$expectedHash]);
+            if($update->rowCount()!==1){$this->db->commit();return null;}
+            $select=$this->db->prepare('SELECT auth_version FROM users WHERE id=?');
+            $select->execute([$id]);
+            $version=$select->fetchColumn();
+            if($version===false)throw new \RuntimeException('Updated account version could not be read.');
+            $this->db->commit();
+            return (int)$version;
+        } catch (\Throwable $error) {
+            if($this->db->inTransaction())$this->db->rollBack();
+            throw $error;
+        }
+    }
 }
